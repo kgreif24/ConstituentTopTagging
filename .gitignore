@@ -1,0 +1,10 @@
+*.root
+*.h5
+*.h5py
+*.hdf5
+*.pyc
+
+plt
+tmp
+venv
+.git
