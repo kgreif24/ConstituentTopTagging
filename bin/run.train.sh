@@ -21,7 +21,11 @@ fi
 # Path to file for training
 FILE=$PATH2EOS/training/${CERN_USER}.data4tagger.1M.ak10ufosd.rel22p0.root
 
-BS=500
-# Start training of the model
-OUTDIR=$PATHHOME/out/AK10UFOSD/rel22p0/EF/$ARCH/$BS/Phi300-300-300_F300-300
-$PATHHOME/train.py --input $FILE --outdir $OUTDIR --n-epoch 100 --batch-size $BS --n-train 500000 --Phi-size 300 300 300 --F-sizes 300 300 --architecture $ARCH
+BS=200
+NC=3
+for nconstit in 3
+do
+  # Start training of the model
+  OUTDIR=$PATHHOME/out/AK10UFOSD/rel22p0/EF/$ARCH/bs${BS}_nc${nconstit}/Phi100-100_F100-50-25-10/
+  $PATHHOME/train.py --input $FILE --outdir $OUTDIR --n-epoch 50 --batch-size $BS --n-train 300000 --n-constit ${nconstit} --Phi-size 100 100 --F-sizes 50 25 10 --architecture $ARCH &
+done

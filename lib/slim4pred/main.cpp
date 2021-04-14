@@ -185,24 +185,30 @@ int main (int argc, char **argv)
   // Run parallel
   ROOT::EnableImplicitMT();
 
-  for(auto & el : fin) std::cout << " |-" << el << std::endl;
+  for(auto & el : fin) std::cout << " |- " << el << std::endl;
+  std::cout << "[INFO] Branches to keep" << std::endl;
+  for(auto & el : branches) std::cout << " |- " << el << std::endl;
 
   // Initialize an RDF
   ROOT::RDataFrame RDF(treename, fin);
 
   auto RDF_true = RDF.Filter(sel_true, sel_true).Define("fjet_signal", label);
 
+  std::cout << "[INFO] Basic selection" << std::endl;
   auto filtNames = RDF_true.GetFilterNames();
-  for (auto &&filtName : filtNames) std::cout << filtName << std::endl;
+  for (auto &&filtName : filtNames) std::cout << " |- " << filtName << std::endl;
 
   /*
-    Events that do NOT pass the tagger cut(s)
+    Events that do NOT pass the tagger cut(s)a
   */
 
   std::string fout_fail(fout);
   fout_fail.replace(fout_fail.find(".root"), sizeof(".root") - 1, ".fail.root");
-  RDF_true.Filter("!("+sel_train+")", "!("+sel_train+")").Define("fjet_dnnScore", "0.0")
-          .Snapshot(treename, fout_fail, branches);
+  auto RDF_fail = RDF_true.Filter("!("+sel_train+")", "!("+sel_train+")").Define("fjet_dnnScore", "0.0");
+  std::cout << "[INFO] Fail selection" << std::endl;
+  auto filtNames_fail = RDF_fail.GetFilterNames();
+  for (auto &&filtName : filtNames_fail) std::cout << " |- " << filtName << std::endl;
+  RDF_fail.Snapshot(treename, fout_fail, branches);
 
   /*
     Events that do PASS the tagger cut(s)
@@ -241,8 +247,13 @@ int main (int argc, char **argv)
     .Define("fjet_sortClusCenterRotFlip_eta", flip, {"_fjet_sortClusCenterRot_eta", "fjet_parity"})
     // Normalize scaler components by scaler pT sum
     .Define("fjet_sortClusNormByPt_pt", norm, {"_fjet_sortClus_pt", "_fjet_sortClus_pt"})
-    .Define("fjet_sortClusNormByPt_e",  norm, {"_fjet_sortClus_e", "_fjet_sortClus_pt"})
-    .Snapshot(treename, fout_pass, branches);
+    .Define("fjet_sortClusNormByPt_e",  norm, {"_fjet_sortClus_e", "_fjet_sortClus_pt"});
+
+  std::cout << "[INFO] Passed selection" << std::endl;
+  auto filtNames_pass = RDF_pass.GetFilterNames();
+  for (auto &&filtName : filtNames_pass) std::cout << " |- " << filtName << std::endl;
+
+  RDF_pass.Snapshot(treename, fout_pass, branches);
  // RDF_pass.Snapshot(treename, "/tmp/csauer/pass." + fout, drop_cols(RDF_pass.GetColumnNames()));
 
   return 0;

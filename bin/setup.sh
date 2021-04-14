@@ -20,6 +20,7 @@ export USER_INITIAL="$(echo $CERN_USER | head -c 1)"
 export PATHHOME="$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. >/dev/null 2>&1 && pwd )"
 export PATH2BIN=$PATHHOME/bin
 export PATH2SRC=$PATHHOME/src
+export PATH2PLT=$PATHHOME/plt
 export PATH2DAT=$PATHHOME/dat
 export PATH2OUT=$PATHHOME/out
 export PATH2ETC=$PATHHOME/etc

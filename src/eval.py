@@ -17,7 +17,7 @@ import myplt, myhep
 from myplt.figure import Figure
 from myroot.convert import conv2vec
 from myroot.algo.optimization import eff
-from myroot.algo.performance import roc_curve_binned
+from myroot.algo.performance import roc_curve_binned, rej_bkg_from_roc
 
 
 """
@@ -77,7 +77,7 @@ def _plt_score (h_sig, h_bkg, pt_low, pt_high, fname):
 
   myplt.settings.common_head_reset()
   myplt.settings.common_head() \
-    .addRow(text="#sqrt{s}=13 TeV,  |#eta|<2.0,  p_{T} #in [%s, %s] (GeV)" % (pt_low, pt_high)) \
+    .addRow(text="#sqrt{s}=13 TeV,  |#eta|<2.0,  m>40 GeV,  p_{T} #in [%s, %s] (GeV)" % (pt_low, pt_high)) \
     .setTextAlign("left")
   # Save the figure ...
   Figure(canv=(600,500)) \
@@ -90,11 +90,31 @@ def _plt_score (h_sig, h_bkg, pt_low, pt_high, fname):
     .save(fname).close()
 
 
+def _plt_score_vs_pt (h2, fname):
+
+  myplt.settings.common_head_reset()
+  myplt.settings.common_head() \
+    .addRow(text="#sqrt{s}=13 TeV,  |#eta|<2.0,  m>40 GeV") \
+    .setTextAlign("left")
+  # Save the figure ...
+  Figure(canv=(600,500)) \
+    .setColorPalette(103) \
+    .setDrawOption("COLZ") \
+    .addHist(h2) \
+    .addAxisTitle(
+       title_x="Transverse momentum p^{true}_{T} [GeV]",
+       title_y="DNN classification score",
+       title_z="Number of weighted events") \
+    .setPadMargin() \
+    .setLogZ(0, h2.GetMaximum()) \
+    .save(fname).close()
+
+
 def _plt_roc_family (graphs, fname):
 
   myplt.settings.common_head_reset()
   myplt.settings.common_head() \
-    .addRow(text="#sqrt{s}=13 TeV,  |#eta|<2.0") \
+    .addRow(text="#sqrt{s}=13 TeV,  |#eta|<2.0,  m>40 GeV") \
     .setTextAlign("left")
 
   # Plot list of fitting curves
@@ -116,7 +136,7 @@ def _plt_roc (graph, pt_low, pt_high, fname):
 
   myplt.settings.common_head_reset()
   myplt.settings.common_head() \
-    .addRow(text="#sqrt{s}=13 TeV,  |#eta|<2.0,  p_{T} #in [%s, %s] (GeV)" % (pt_low, pt_high)) \
+    .addRow(text="#sqrt{s}=13 TeV,  |#eta|<2.0,  m>40 GeV,  p_{T} #in [%s, %s] (GeV)" % (pt_low, pt_high)) \
     .setTextAlign("left")
   # Plot ROC curve
   Figure(canv=(600,500)) \
@@ -148,6 +168,9 @@ def _plt_cut (histo, wp100_str, fname):
 
 def _plt_fits (fits, wp100_str, fname):
 
+  myplt.settings.common_head_reset()
+  myplt.settings.common_head() \
+    .addRow(text="#sqrt{s}=13 TeV,  |#eta|<2.0,  m>40 GeV,  DNN top tagger").setTextAlign("left")
   Figure(canv=(600,500)) \
     .setDrawOption("PLC PMC") \
     .addGraph(fits, range_y=(1.2*(1-float(wp100_str)/100.), 1.2)) \
@@ -155,6 +178,21 @@ def _plt_fits (fits, wp100_str, fname):
       title_x="Transverse momentum p^{true}_{T} [GeV]",
       title_y="Lower DNN-score cut @ #varepsilon_{sig}=" + wp100_str + "%") \
       .addLegend(title="#bf{Polynomial order}") \
+    .save(fname).close()
+
+
+def _plt_rej_bkg (h_bkg_rej, wp100_str, fname):
+
+  myplt.settings.common_head_reset()
+  myplt.settings.common_head() \
+    .addRow(text="#sqrt{s}=13 TeV,  |#eta|<2.0,  m>40 GeV,  DNN top tagger").setTextAlign("left")
+  # - Background rejection
+  Figure(canv=(600,500)) \
+    .setDrawOption("PLC PMC HIST") \
+    .addHist(h_bkg_rej) \
+    .addAxisTitle(
+      title_x="Transverse momentum p^{true}_{T} [GeV]",
+      title_y="Background rejection 1/#varepsilon_{bkg} @ #varepsilon_{sig}=" + wp100_str + "%") \
     .save(fname).close()
 
 
@@ -264,8 +302,20 @@ class EvalQuick (myutils.walker.Walker, myroot.fio.FileIo):
     self.addObj(t_h1_cut, "OutputQuick.root")
 
     # Fit discrete weights to get a smooth function of pT
-    fits =  _fit_on_score(t_h1_cut, orders, wp100_str)
+    fits = _fit_on_score(t_h1_cut, orders, wp100_str)
     self.addObj(fits, "FitFunctionsQuick.root")
+
+    """
+      Save correlations
+    """
+
+    _plt_score_vs_pt(t_h2_sig, os.path.join(self.get("home"), "plt/pt_vs_dnnScore_sig_quick"))
+    _plt_score_vs_pt(t_h2_bkg, os.path.join(self.get("home"), "plt/pt_vs_dnnScore_bkg_quick"))
+    self.addObj([t_h2_sig, t_h2_bkg], "OutputQuick.root")
+
+    """
+      Roc Curves
+    """
 
     # List of graphs (ROC curves)
     graphs = []
@@ -279,6 +329,30 @@ class EvalQuick (myutils.walker.Walker, myroot.fio.FileIo):
       self.addObj(graphs, "OutputQuick.root")
     # Plot family of ROC curves
     _plt_roc_family(graphs, os.path.join(self.get("home"), "plt/roc_family_quick"))
+
+
+    """
+      Background rejection
+    """
+
+    hname_eff = myutils.name.encode([("v", "dnn"), ("d", "effSig"), ("wp", wp100_str)])
+    hname_rej = myutils.name.encode([("v", "dnn"), ("d", "rejBkg"), ("wp", wp100_str)])
+    # -- Signal efficiency
+    h_sig_eff = ROOT.TH1F(hname_eff, hname_eff, len(self.pt_bins)-1, self.pt_bins)
+    # -- Background rejection
+    h_bkg_rej = ROOT.TH1F(hname_rej, hname_rej, len(self.pt_bins)-1, self.pt_bins)
+
+    # Background rejection from ROC curves
+    rej_bkg = rej_bkg_from_roc(graphs, working_point)
+
+    # Fill histograms
+    for i_bin, rej in enumerate(rej_bkg):
+      h_bkg_rej.SetBinContent(i_bin + 1, rej)
+      h_bkg_rej.SetBinError(i_bin + 1, 0)
+    self.addObj(h_bkg_rej, "OutputQuick.root")
+
+    # Plot
+    _plt_rej_bkg(h_bkg_rej, wp100_str, os.path.join(self.get("home"), "plt/rej_bkg_wp_%s_quick" % wp100_str))
 
     return self
 

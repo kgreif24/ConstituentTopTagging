@@ -103,6 +103,13 @@ class FileSlimmer (multiprocessing.Process):
     elif (n_entries % __batch_size__) != 0:
       steps += [(steps[-1][1], steps[-1][1]+(n_entries % __batch_size__))]
 
+    print("[\033[1mINFO\033[0m] -- Slicing info --")
+    print("[\033[1mINFO\033[0m] Total number of entries: %s" % n_entries)
+    print("[\033[1mINFO\033[0m] Number of batches: %s" % n_batches)
+    for steps in steps: print("     |- (%s, %s): %s" % (steps[0], steps[1]))
+    print("[\033[1mINFO\033[0m] ----")
+
+
     n_max = self._info["NConstit"]
     dtypes = [(col, "f8") for col in self._info["SlimList"] if col!=__sig_tag__] + [(__sig_tag__, "i4")]
 
@@ -134,7 +141,7 @@ class FileSlimmer (multiprocessing.Process):
           X[j,:n_const,3] = clus_e[:n_const]
 
         # Get predition by tagger
-        data[__dnn_score__][:] = model.predict(X, verbose=1, use_multiprocessing=True)[:,1].flatten()
+        data[__dnn_score__][:] = model.predict(X, verbose=1)[:,1].flatten()
         root_numpy.array2root(data, self._info["Path2Fout"], self._info["TreeName"], mode="update")
 
     tRead.Close()
@@ -154,11 +161,17 @@ def _slim (info):
   from myroot.reader import read_file_list
   flist_sig = " ".join(read_file_list(info["FilesSig"]))
   flist_bkg = " ".join(read_file_list(info["FilesBkg"]))
-
   # Set filters
   filter_basic_sig = info["SelectionSig"].replace(" ", "")
   filter_basic_bkg = info["SelectionBkg"].replace(" ", "")
   filter_train     = info["SelectionTrain"].replace(" ", "")
+
+  print("[\033[1mINFO\033[0m] Selection signal:")
+  print("     |- %s" % filter_basic_sig)
+  print("[\033[1mINFO\033[0m] Selection background:")
+  print("     |- %s" % filter_basic_bkg)
+  print("[\033[1mINFO\033[0m] Selection training:")
+  print("     |- %s" % filter_train)
 
   # Make sure tmp directory exists
   info["Path2Tmp"] = os.path.join("/tmp/csauer", info["Identify"])

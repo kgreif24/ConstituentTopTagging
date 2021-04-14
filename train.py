@@ -18,6 +18,7 @@ __conf__ = \
   "batch-size"    : True,
   "n-train"       : True,
   "n-epoch"       : True,
+  "n-constit"     : True,
   "sample-weight" : True,
   "target"        : True,
   "load"          : True,
@@ -44,9 +45,7 @@ def _run ():
   myplt.settings.common_text() \
     .addExperiment() \
     .addText(jetInfo.getReconstructionAndObject()) \
-    .addText(jetInfo.getGroomer()[1]) \
-    .addText("|#eta|<2.0") \
-    .addText("#sqrt{s}=13 TeV")
+    .addText(jetInfo.getGroomer()[1])
 
   """
     Build project directory structure
@@ -95,7 +94,7 @@ def _run ():
   # Add training weight
   dp.setWeight(args.sample_weight)
   # Set number of constituents
-  dp.setNConstit(200)
+  dp.setNConstit(args.n_constit)
   # Print config
   dp.display()
 
@@ -114,7 +113,7 @@ def _run ():
     dnn = EFN(input_dim=2, Phi_sizes=tuple(args.Phi_sizes), F_sizes=tuple(args.F_sizes), summary=(0==0), optimizer=opt)
   elif args.architecture == "DNN":
     dnn = tf.keras.models.Sequential()
-    dnn.add(tf.keras.layers.Dense(200, input_dim=4*200, activation='relu'))
+    dnn.add(tf.keras.layers.Dense(200, input_dim=4*args.n_constit, activation='relu'))
     dnn.add(tf.keras.layers.BatchNormalization())
     dnn.add(tf.keras.layers.Dense(50, activation='relu'))
     dnn.add(tf.keras.layers.BatchNormalization())
@@ -125,7 +124,7 @@ def _run ():
     # Compile model
   elif args.architecture == "RNN":
     dnn = tf.keras.models.Sequential()
-    dnn.add(tf.keras.layers.Masking(mask_value=0.0, input_shape=(200,4)))
+    dnn.add(tf.keras.layers.Masking(mask_value=0.0, input_shape=(args.n_constit, 4)))
     dnn.add(tf.keras.layers.LSTM(25, return_sequences=False))
     dnn.add(tf.keras.layers.Dense(2, activation='softmax'))
     dnn.compile(loss="categorical_crossentropy", optimizer=tf.keras.optimizers.Adam(lr=0.001), metrics=["accuracy"])
@@ -151,7 +150,7 @@ def _run ():
   with open(orga.get("conf", "metadata.json"), "w") as fJSON:
     fROOT = ROOT.TFile(args.input, "READ")
     meta = {obj.GetName():obj.GetTitle() for obj in fROOT.Get("train").GetUserInfo()}
-    meta["NConstit"] = 200
+    meta["NConstit"] = args.n_constit
     meta["Architecture"] = args.architecture
     json.dump(meta, fJSON)
     fROOT.Close()

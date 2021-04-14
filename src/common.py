@@ -90,6 +90,7 @@ help_txt_pad = "Text to be displayed in pad (default: %(default)s)."
 help_poly_order = "Order of the polynomial (default: %(default)s)."
 help_config = "Path to configuration file of the model."
 help_working_point = "Working point (default: %(default)s)."
+help_n_constit = "Number of constituents (default: %(default)s)."
 
 # Defaults
 def_truth_label = "rel22.0"
@@ -134,6 +135,7 @@ def_txt_top = []
 def_txt_pad = []
 def_poly_order = 7
 def_working_point = 50
+def_n_constit = 200
 
 # Choices
 choices_objective = ["binary_crossentropy" , "categorical_crossentropy", "mse"]
@@ -211,6 +213,9 @@ arguments = {
   "adam-beta2": \
     dict(type=float, default = def_adam_beta2,
     help=help_adam_beta2),
+  "n-constit": \
+    dict(type=int, default=def_n_constit,
+    help=help_n_constit),
   "n-epoch": \
     dict(type=int, default=def_n_epoch,
     help=help_n_epoch),
