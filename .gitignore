@@ -3,6 +3,7 @@
 *.h5py
 *.hdf5
 *.pyc
+.init2p7
 
 .plt
 plt
