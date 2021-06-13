@@ -33,7 +33,7 @@ __conf = \
 
 def _selection (branches, truth_label):
 
-  import myroot.cut
+  import src.myroot.cut
   # Read the current selection from configuration file
   conf = configparser.ConfigParser(allow_no_value=True, encoding="ascii")
   conf.read([os.path.join(path2home, "etc/selection.ini")])

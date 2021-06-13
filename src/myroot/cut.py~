@@ -1,0 +1,288 @@
+import utils
+import numpy as np
+
+
+# Some global variables
+__common_cut__ = {}
+
+
+def standardize_exp(expression, delimiter="&&", rtype=list, engulfed=False, verbose=False):
+
+  if not isinstance(expression, list): expression = expression.split(delimiter)
+
+  # Apply some operations on each expression to get a standardized form
+  for i in range(len(expression)):
+    exp = expression[i]
+    if exp == "": continue
+    if verbose: print("       |- Before standardization: %s" % exp)
+    # Remove all spaces
+    exp = exp.replace(" ", "")
+    # Remove redundant parentheses
+    # -- Non-closing
+    if exp[0] == "(" and exp[-1] != ")": exp = exp[1:]
+    if exp[0] != "(" and exp[-1] == ")" and "Power" not in exp and "^" not in exp and exp.count("(") == exp.count(")"):
+      exp = exp[:-1]
+    # -- Redundant
+    if exp[0] == "(" and exp[-1] == ")": exp = exp[1:-1]
+    if verbose: print("       |- After standardization: %s" % exp)
+    if not engulfed:
+      expression[i] = exp
+    else:
+      expression[i] = "(%s)" % exp
+
+  if rtype == list: return expression
+  elif rtype == str:
+    # Return stabdardized expression as one string
+    return delimiter.join(expression)
+
+
+def selection(weight="", cut="", delimiter_weight="*", delimiter_cut="&&", verbose=False):
+
+  # Check input
+  if isinstance(weight, list): weight = delimiter_weight.join(weight)
+  if isinstance(cut, list): cut = delimiter_cut.join(cut)
+
+  # -- Event weight
+  # Check number of factors (event weights)
+  n_factors = len(list(filter(None, weight.split(delimiter_weight))))
+  if n_factors == 0: weight_exp = "1"
+  else: weight_exp = "*".join(weight.split(delimiter_weight))
+  # Apply delimiter
+  weight_exp = weight_exp.replace(" ","")
+
+  # -- Event cut
+  # Split cuts into components
+  n_cuts = len(list(filter(None, cut.split(delimiter_cut))))
+  if n_cuts == 0: cut_exp = ""
+  else: cut_exp = "&&".join(cut.split(delimiter_cut))
+  # Apply delimiter
+  cut_exp = cut_exp.replace(" ","")
+
+  # Combine weights and cuts
+  if cut_exp!="": selection = "%s*(%s)" % (weight_exp, cut_exp)
+  else: selection = weight_exp
+
+  if verbose:
+    print("[INFO] The following cut(s) will be used: %s" % cut_exp)
+    print("[INFO] The following event weight will be used: %s" % weight_exp)
+    print("[INFO] The following selection will be used for each event: \33[1m%s\33[0m" % selection)
+  return selection
+
+
+
+def get_limits(n_bin, x_array, verbose=True, rtype=float):
+
+  if n_bin == len(x_array)-1:
+    low, high = x_array[0], x_array[n_bin]
+  else:
+    low, high = x_array[n_bin], x_array[n_bin+1]
+  if verbose:
+    print("[INFO] Bin: [%s,%s]" % (low, high))
+  return rtype(low), rtype(high)
+
+
+def get_selection(selection={"common":[], "sig":[], "bkg":[]}, branches=[], filter_nan=False, filter_inf=False, filter_defaults=False, filter_other=None, verbose=False):
+
+  # Add `common` selection to all other keys
+  common_selection = list(selection.pop("common"))
+  # make sure that the training set dies not contain nans
+  for branch_name in branches:
+    if filter_nan:
+      common_selection.append("TMath::IsNaN(%s)!=1" % branch_name)
+    if filter_inf:
+      common_selection.append("TMath::Finite(%s)==1" % branch_name)
+    if filter_defaults:
+      common_selection.append("%s!=%s" % (branch_name, filter_defaults))
+  if filter_other:
+    common_selection.append(filter_other)
+
+  # Build cut string
+  for key in selection.keys():
+    # Remove potential empty strings from list
+    selection[key] = filter(None, selection[key])
+    # Update string expression
+    selection[key] = "(%s)" % " && ".join(selection[key] + common_selection)
+    if verbose:
+      print("[INFO] Cuts (%s): %s" % (key, selection[key]))
+
+  return selection
+
+
+class CutStr(object):
+
+
+  def __init__(self):
+
+    self.cut_list = []
+    self.weight_list = []
+
+    # Some other members
+    self.engulfed = False
+
+
+  def __str__(self):
+
+    return selection(weight=self.weight_list, cut=self.cut_list)
+
+
+  def addBranchCut(self, branch_exp, branch_low=None, branch_high=None):
+
+    expression = ""
+    if branch_low and not branch_high:
+      expression = "%s>%s" % (branch_exp, branch_low)
+    elif branch_high and not branch_low:
+      expression = "%s<%s" % (branch_exp, branch_high)
+    elif branch_low and branch_high:
+      expression = "%s>%s&&%s<%s" % (branch_exp, branch_low, branch_exp, branch_high)
+    else: return
+
+    # Standardize expression
+    exp = standardize_exp(expression, delimiter="&&", rtype=str, engulfed=self.engulfed)
+
+    # Check if this expression already exists in list
+    if exp not in self.cut_list: self.cut_list.append(exp)
+
+
+  def addBoolExp(self, expression):
+
+    # Standardize expression
+    exp = standardize_exp(expression, delimiter="&&", rtype=str, engulfed=self.engulfed)
+
+    # Check if this expression already exists in list
+    if exp not in self.cut_list: self.cut_list.append(exp)
+
+
+  def addEventWeight(self, exp):
+
+    # Standardize expression
+    w = standardize_exp(exp, delimiter="*", rtype=str)
+
+    # Check if this expression already exists in list
+    if w not in self.weight_list: self.weight_list.append(w)
+
+
+  def addPolyomialCut(self, x_branch_exp, y_branch_exp, t_f1, side="gt", exponent="Power"):
+
+    # Get order of polynomial
+    if "TF1" in type(t_f1).__name__: n_order = t_f1.GetNpar()
+    else: n_order = len(t_f1)
+
+    # Loop over all parameters
+    tmp_list = []
+    for j_par in range(n_order):
+      if "TF1" in type(t_f1).__name__: par = str(t_f1.GetParameter(j_par))
+      else: par = t_f1.pop(0)
+      if j_par == 0:
+        tmp_list.append("%s" % par)
+      else:
+        if exponent == "^":
+          tmp_list.append("(%s)*(%s)^%s" % (par, x_branch_exp, j_par))
+        elif exponent.lower() == "power":
+          tmp_list.append("(%s)*TMath::Power(%s,%s)" % (par, x_branch_exp, j_par))
+        else:
+          print("[ERROR] The argument `%s` is not a valid expression for an exponent [^/Power]." % exponent)
+          sys.exit()
+
+    # Based on side, get operation
+    if side == "gt": opr = ">"
+    elif side == "lt": opr = "<"
+    elif side == "et": opr = "=="
+
+    # Get the cut and standardize expression
+    cut = y_branch_exp + opr + "(" + "+".join(tmp_list) + ")"
+    #cut = standardize_exp(cut, rtype=str, engulfed=self.engulfed)
+
+    # Add the constructed cut to list of cuts
+    self.cut_list.append(cut)
+
+
+  def engulfExpressions(self, engulfed=True):
+
+    self.engulfed = engulfed
+
+
+  def getCutList(self):
+
+    return self.cut_list
+
+
+  def getWeightList(self):
+
+    return self.weight_list
+
+
+def rootlike_selection(arr, branches=None, selection=None, object_selection=None, start=None, stop=None, step=None, include_weight=False, weight_name="weight", cache_size=-1):
+
+  # TODO: Move to RDF
+
+  """
+    arr : structured numpy array
+        ROOT file name pattern or list of patterns. Wildcarding is supported by
+        Python globbing.
+    branches : list of strings and tuples or a string or tuple, optional (default=None)
+        List of branches and expressions to include as columns of the array or
+        a single branch or expression in which case a nonstructured array is
+        returned. If None then include all branches that can be converted.
+        Branches or expressions that result in variable-length subarrays can be
+        truncated at a fixed length by using the tuple ``(branch_or_expression,
+        fill_value, length)`` or converted into a single value with
+        ``(branch_or_expression, fill_value)`` where ``length==1`` is implied.
+        ``fill_value`` is used when the original array is shorter than
+        ``length``. This truncation is after any object selection performed
+        with the ``object_selection`` argument.
+    selection : str, optional (default=None)
+        Only include entries fulfilling this condition. If the condition
+        evaluates to multiple values per tree entry (e.g. conditions on array
+        branches) then an entry will be included if the condition evaluates to
+        true for at least one array element.
+    object_selection : dict, optional (default=None)
+        A dictionary mapping selection strings to branch names or lists of
+        branch names. Only array elements passing the selection strings will be
+        included in the output array per entry in the tree. The branches
+        specified must be variable-length array-type branches and the length of
+        the selection and branches it acts on must match for each tree entry.
+        For example ``object_selection={'a > 0': ['a', 'b']}`` will include all
+        elements of 'a' and corresponding elements of 'b' where 'a > 0' for
+        each tree entry. 'a' and 'b' must have the same length in every tree
+        entry.
+    start, stop, step: int, optional (default=None)
+        The meaning of the ``start``, ``stop`` and ``step`` parameters is the
+        same as for Python slices. If a range is supplied (by setting some of
+        the ``start``, ``stop`` or ``step`` parameters), only the entries in
+        that range and fulfilling the ``selection`` condition (if defined) are
+        used.
+    include_weight : bool, optional (default=False)
+        Include a column containing the tree weight ``TTree::GetWeight()``.
+        Note that this will be the same value for all entries unless the tree
+        is actually a TChain containing multiple trees with different weights.
+    weight_name : str, optional (default='weight')
+        The field name for the weight column if ``include_weight=True``.
+    cache_size : int, optional (default=-1)
+        Set the size (in bytes) of the TTreeCache used while reading a TTree. A
+        value of -1 uses ROOT's default cache size. A value of 0 disables the
+        cache.
+  """
+
+  import ROOT
+  ROOT.gErrorIgnoreLevel = 5999
+  import root_numpy
+  # Convert array to ROOT.TTree to make use of selection
+  t_tree_tmp = root_numpy.array2tree(arr, name="tmp_tree", tree=None)
+
+  # Get array back and apply selection
+  arr_selection = root_numpy.tree2array(t_tree_tmp, branches, selection, object_selection, start, stop, step, include_weight, weight_name, cache_size).view(np.recarray)
+  ROOT.gErrorIgnoreLevel = -1
+
+  # Return array with cuts applied
+  return arr_selection
+
+
+if __name__ == "__main__":
+
+  # Define structured array
+  a = np.array([(1, 2.5, 3.4), (4, 5, 6.8)],
+    dtype=[("a", np.int32), ("b", np.float32), ("c", np.float64)])
+  print("Before cut:", a)
+  # Apply some cuts based on ROOT's selection expressions
+  a_cut = rootlike_selection(a, selection="a>1")
+  print("After cut:", a_cut)
