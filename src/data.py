@@ -8,7 +8,7 @@ import subprocess
 # Scientific imports
 import numpy as np
 import root_numpy
-import uproot3
+import uproot
 import ROOT
 ROOT.PyConfig.IgnoreCommandLineOptions = True
 
@@ -21,11 +21,11 @@ from energyflow.utils import data_split, to_categorical
 # Custom imports
 import common
 import utils
-import myroot.reader
-import myroot.convert
-import myutils
-import myutils.walker
-import myutils.profile
+import src.myroot.reader
+import src.myroot.convert
+import src.myutils
+import src.myutils.walker
+import src.myutils.profile
 
 
 # Path variables
@@ -249,14 +249,14 @@ class DataPipe (object):
 
 
 
-class DataBuilder(myutils.walker.Walker):
+class DataBuilder(src.myutils.walker.Walker):
 
 
   def __init__ (self, fout, files_sig=None, files_bkg=None, treename="FlatSubstructureJetTree"):
 
     self.fout = fout
     self.path2out = os.path.dirname(self.fout)
-    myutils.walker.Walker.__init__(self, self.path2out, write_mode="update")
+    src.myutils.walker.Walker.__init__(self, self.path2out, write_mode="update")
     # Some other members
     self.n_tot = int(1E6)
     self.n_threads = 0
@@ -290,16 +290,16 @@ class DataBuilder(myutils.walker.Walker):
   def _slim (self):
 
     # Get files
-    flist_sig = myroot.reader.read_file_list(self.info["FilesSig"])
-    flist_bkg = myroot.reader.read_file_list(self.info["FilesBkg"])
+    flist_sig = src.myroot.reader.read_file_list(self.info["FilesSig"])
+    flist_bkg = src.myroot.reader.read_file_list(self.info["FilesBkg"])
 
     # Shuffle files
     random.Random(self.info["RandSeed"]).shuffle(flist_sig)
     random.Random(self.info["RandSeed"]).shuffle(flist_bkg)
 
     # RDF for signal and background
-    rdf_sig = ROOT.RDataFrame(self.info["TreeName"], myroot.convert.conv2vec(flist_sig))
-    rdf_bkg = ROOT.RDataFrame(self.info["TreeName"], myroot.convert.conv2vec(flist_bkg))
+    rdf_sig = ROOT.RDataFrame(self.info["TreeName"], src.myroot.convert.conv2vec(flist_sig))
+    rdf_bkg = ROOT.RDataFrame(self.info["TreeName"], src.myroot.convert.conv2vec(flist_bkg))
 
     # Set filters
     filter_basic_sig = self.info["SelectionSig"]
@@ -407,7 +407,7 @@ class DataBuilder(myutils.walker.Walker):
   def _save2root (self):
 
     # Add metadata to ROOT file
-    from myroot.fio import TFile
+    from src.myroot.fio import TFile
     with TFile(self.fout, "UPDATE") as fROOT:
       # Get info object associated to tree
       for obj in fROOT.GetListOfKeys():
@@ -449,7 +449,7 @@ class DataBuilder(myutils.walker.Walker):
     # Start plotting
     fout_sig = os.path.join(outdir, "inspection_sig.root")
     fout_bkg = os.path.join(outdir, "inspection_bkg.root")
-    from myroot.fio import FileIo
+    from src.myroot.fio import FileIo
     fio = FileIo()
     fio.addFile(fout_sig, "update")
     fio.addFile(fout_bkg, "update")
@@ -505,8 +505,8 @@ class DataBuilder(myutils.walker.Walker):
 
     assert self.info["FilesSig"] and self.info["FilesBkg"], "[ERROR] Please provide the input files first"
     # Create temporary RDF to check if requested number exeeds the available one
-    flist = myroot.reader.read_file_list(self.info["FilesSig"]) + myroot.reader.read_file_list(self.info["FilesBkg"])
-    n_avail = ROOT.RDataFrame(self.info["TreeName"], myroot.convert.conv2vec(flist)).Count().GetValue()
+    flist = src.myroot.reader.read_file_list(self.info["FilesSig"]) + src.myroot.reader.read_file_list(self.info["FilesBkg"])
+    n_avail = ROOT.RDataFrame(self.info["TreeName"], src.myroot.convert.conv2vec(flist)).Count().GetValue()
     self.n_tot = int(n_req)
     if n_avail < self.n_tot:
       print("[WARNING] %s events have been requested, but only %s are available." % (self.n_tot, n_avail))
@@ -541,31 +541,31 @@ class DataBuilder(myutils.walker.Walker):
   def build (self, save_h5=False):
 
     # Make some preparations before starting
-    with myutils.profile.Profile("Prepare run"):
+    with src.myutils.profile.Profile("Prepare run"):
       self._prep()
 
     # Slim the data set
-    with myutils.profile.Profile("Slim data"):
+    with src.myutils.profile.Profile("Slim data"):
       self._slim()
 
     # Shuffle data
-    with myutils.profile.Profile("Shuffle"):
+    with src.myutils.profile.Profile("Shuffle"):
       self._shuffle()
 
     # Compute weights to get flat pt
-    with myutils.profile.Profile("Preprocess data, add columns"):
+    with src.myutils.profile.Profile("Preprocess data, add columns"):
       self._preprocess()
 
     # Compute weights to get flat pt
-    with myutils.profile.Profile("Compute training weights"):
+    with src.myutils.profile.Profile("Compute training weights"):
       self._add_weights()
 
     # Split into training and testing set
-    with myutils.profile.Profile("Split data into training and validation data"):
+    with src.myutils.profile.Profile("Split data into training and validation data"):
       self._split()
 
     # Save as ROOT file
-    with myutils.profile.Profile("Save data to ROOT file"):
+    with src.myutils.profile.Profile("Save data to ROOT file"):
       self._save2root()
 
 

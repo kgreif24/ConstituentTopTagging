@@ -1,5 +1,3 @@
-#!/usr/bin/env python2
-
 # Standard imports
 import os, sys
 import configparser
@@ -60,21 +58,6 @@ def _run ():
 
   # Command-line arguments pser
   args = src.common.get_parser(**__conf).parse_args()
-
-  """
-    To be displayed on plots
-  """
-
-  import myhep.jets, myplt.settings
-  myplt.settings.common_head() \
-    .addRow(text="#sqrt{s}=13 TeV, |#eta|<2.0, training-validation data") \
-    .setTextAlign("left")
-  # Add some standard text to all plots
-  jetInfo = myhep.jets.JetInfo("AntiKt10UFOCSSKSoftDropBeta100Zcut10Jets")
-  myplt.settings.common_text() \
-    .addExperiment() \
-    .addText(jetInfo.getReconstructionAndObject()) \
-    .addText(jetInfo.getGroomer()[1])
 
   # Read the current selection from configuration file
   conf = configparser.ConfigParser(allow_no_value=True, encoding="ascii")
