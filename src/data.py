@@ -13,7 +13,6 @@ import ROOT
 ROOT.PyConfig.IgnoreCommandLineOptions = True
 
 # Energy-flow related imports
-import tensorflow as tf
 import energyflow as ef
 from energyflow.datasets import qg_nsubs
 from energyflow.utils import data_split, to_categorical
@@ -262,7 +261,7 @@ class DataBuilder(src.myutils.walker.Walker):
     self.n_threads = 0
     self.branches = ROOT.vector("string")()
     # Generate a unique id for this run
-    self.stamp = uuid.uuid4().get_hex()
+    self.stamp = uuid.uuid4().hex
 
     # This metadata will be stored
     self.info = \

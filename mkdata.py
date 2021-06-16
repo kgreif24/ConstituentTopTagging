@@ -33,8 +33,8 @@ def _selection (branches, truth_label):
 
   import src.myroot.cut
   # Read the current selection from configuration file
-  conf = configparser.ConfigParser(allow_no_value=True, encoding="ascii")
-  conf.read([os.path.join(path2home, "etc/selection.ini")])
+  conf = configparser.ConfigParser(allow_no_value=True)
+  conf.read([os.path.join(path2home, "etc/selection.ini")], encoding="ascii")
 
   # Get delimiter from config file(s)
   label, delim = conf[truth_label], conf["config"]["delim"]
@@ -50,7 +50,7 @@ def _selection (branches, truth_label):
 
   # From this selection, construct selection string
   sel_train = selection.pop("train")
-  sel_true = myroot.cut.get_selection(selection, branches, filter_other=None)
+  sel_true = src.myroot.cut.get_selection(selection, branches, filter_other=None)
   return (sel_true, sel_train)
 
 
@@ -60,8 +60,8 @@ def _run ():
   args = src.common.get_parser(**__conf).parse_args()
 
   # Read the current selection from configuration file
-  conf = configparser.ConfigParser(allow_no_value=True, encoding="ascii")
-  conf.read([ os.path.join(path2home, "etc/trim_slim.ini")])
+  conf = configparser.ConfigParser(allow_no_value=True)
+  conf.read([ os.path.join(path2home, "etc/trim_slim.ini")], encoding="ascii")
   branches = [branch.encode("ascii","ignore") for branch in conf.get("slim", "branches").split(conf["config"]["delim"])]
 
   """
@@ -84,7 +84,8 @@ def _run ():
   db = src.data.DataBuilder(args.fout)
 
   # Use multi threading (auto. num of threads) to speed up generation of data
-  db.useMT()
+  # db.useMT()
+  print("###################    Multi-threading disabled    #######################")
 
   # Specify the path to the list files (for signal and background)
   # that contain the full path to the ROOT files
