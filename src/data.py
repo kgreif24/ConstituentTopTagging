@@ -8,7 +8,7 @@ import subprocess
 # Scientific imports
 import numpy as np
 import root_numpy
-import uproot
+import uproot3
 import ROOT
 ROOT.PyConfig.IgnoreCommandLineOptions = True
 
