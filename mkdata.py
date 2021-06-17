@@ -84,7 +84,8 @@ def _run ():
   db = src.data.DataBuilder(args.fout)
 
   # Use multi threading (auto. num of threads) to speed up generation of data
-  db.useMT()
+  # db.useMT()
+  print("###################    Multi-threading disabled    #######################")
 
   # Specify the path to the list files (for signal and background)
   # that contain the full path to the ROOT files
