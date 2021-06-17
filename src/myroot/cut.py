@@ -99,7 +99,7 @@ def get_selection(selection={"common":[], "sig":[], "bkg":[]}, branches=[], filt
   # Build cut string
   for key in selection.keys():
     # Remove potential empty strings from list
-    selection[key] = filter(None, selection[key])
+    selection[key] = list(filter(None, selection[key]))
     # Update string expression
     selection[key] = "(%s)" % " && ".join(selection[key] + common_selection)
     if verbose:

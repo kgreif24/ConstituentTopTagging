@@ -93,7 +93,7 @@ help_working_point = "Working point (default: %(default)s)."
 help_n_constit = "Number of constituents (default: %(default)s)."
 
 # Defaults
-def_truth_label = "rel22.0"
+def_truth_label = "rel22p0"
 def_objective = "binary_crossentropy"
 def_suffix_data = ""
 def_suffix_train = ""

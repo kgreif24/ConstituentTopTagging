@@ -3,10 +3,10 @@ project_dir = os.path.abspath(os.path.join(os.path.dirname(__file__)))
 
 import termcolor
 import utils
-import cut as cut_module
+import src.myroot.cut as cut_module
 import fio
 import ROOT
-import common.profile
+import src.myroot.common.profile
 
 
 # RDF-related variables
