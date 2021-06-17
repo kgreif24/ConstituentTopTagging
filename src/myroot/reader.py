@@ -588,7 +588,7 @@ def ls_branches(fname, treename, verbose=True):
   return branches
 
 
-@common.profile.profile
+@src.myroot.common.profile.profile
 def read_cache(t_file=__t_file__):
 
   """
