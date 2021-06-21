@@ -546,11 +546,9 @@ class DataBuilder(src.myutils.walker.Walker):
     with src.myutils.profile.Profile("Slim data"):
       self._slim()
 
-
-    # Don't shuffle data for now, just want to check calculations.
-    # # Shuffle data
-    # with src.myutils.profile.Profile("Shuffle"):
-    #   self._shuffle()
+    # Shuffle data
+    with src.myutils.profile.Profile("Shuffle"):
+      self._shuffle()
 
     # Compute weights to get flat pt
     with src.myutils.profile.Profile("Preprocess data, add columns"):
