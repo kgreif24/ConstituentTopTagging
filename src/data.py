@@ -7,15 +7,12 @@ import subprocess
 
 # Scientific imports
 import numpy as np
-import root_numpy
-import uproot3
+import uproot
 import ROOT
+import root_numpy
 ROOT.PyConfig.IgnoreCommandLineOptions = True
 
-# Energy-flow related imports
-import energyflow as ef
-from energyflow.datasets import qg_nsubs
-from energyflow.utils import data_split, to_categorical
+# Deleted energyflow imports, we won't need them
 
 # Custom imports
 import common
@@ -143,7 +140,9 @@ class DataPipe (object):
           # Get targets
           Y = np.array(data[self.meta["Target"]])
           if categorical:
-            Y = to_categorical(Y, num_classes=2)
+            # Y = to_categorical(Y, num_classes=2)
+            print("Feature removed so I could run")
+            print("Best of luck if you ever see this lol")
 
           # Get weights
           if self.meta["Weight"] is not None:
@@ -359,7 +358,7 @@ class DataBuilder(src.myutils.walker.Walker):
     subprocess.call("rm %s" % " ".join(files_slim), shell=True)
 
 
-  def _shuffle (self, steps=500):
+  def _shuffle (self, steps=200):
 
     subprocess.call("%s/lib/shuffle/shuffle --path2tmp %s/tmp --fraction 0.01 -t %s --fin %s --fout %s" % (path2home, path2home, self.info["TreeName"], self.fout, self.fout), shell=True)
 
@@ -401,7 +400,7 @@ class DataBuilder(src.myutils.walker.Walker):
       .Filter("%s<100" % __train_weight__).Filter("%s<100" % "fjet_testing_weight_pt") \
       .Snapshot(self.info["TreeName"], self.fout.replace(".root", ".limit_weights.root"))
     subprocess.call("mv %s %s" % (self.fout.replace(".root", ".limit_weights.root"), self.fout), shell=True)
-
+ 
 
   def _save2root (self):
 
@@ -547,9 +546,11 @@ class DataBuilder(src.myutils.walker.Walker):
     with src.myutils.profile.Profile("Slim data"):
       self._slim()
 
-    # Shuffle data
-    with src.myutils.profile.Profile("Shuffle"):
-      self._shuffle()
+
+    # Don't shuffle data for now, just want to check calculations.
+    # # Shuffle data
+    # with src.myutils.profile.Profile("Shuffle"):
+    #   self._shuffle()
 
     # Compute weights to get flat pt
     with src.myutils.profile.Profile("Preprocess data, add columns"):

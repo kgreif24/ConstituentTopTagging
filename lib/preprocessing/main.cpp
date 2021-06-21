@@ -39,20 +39,23 @@ auto mass = [](const ROOT::RVec<float> & pt, const ROOT::RVec<float> & eta, cons
   return m;
 };
 
+auto shift_calc = [](const ROOT::RVec<float> & column, const ROOT::RVec<float> & w)
+{
+  float mu = ROOT::VecOps::Dot(column, w) / ROOT::VecOps::Sum(w);
+  return mu;
+};
 
-auto shift_eta = [](const ROOT::RVec<float> & eta, const ROOT::RVec<float> & w)
+auto shift_eta = [](const ROOT::RVec<float> & eta, float & mu)
 {
   ROOT::RVec<float> eta_shift(eta);
-  float mu = ROOT::VecOps::Dot(eta, w) / ROOT::VecOps::Sum(w);
   for(auto & el : eta_shift) el -= mu;
   return eta_shift;
 };
 
 
-auto shift_phi = [](const ROOT::RVec<float> & phi, const ROOT::RVec<float> & w)
+auto shift_phi = [](const ROOT::RVec<float> & phi, float & mu)
 {
   ROOT::RVec<float> phi_shift(phi);
-  float mu = ROOT::VecOps::Dot(phi, w) / ROOT::VecOps::Sum(w);
   for(auto & el : phi_shift)
   {
     el -= mu;
@@ -88,8 +91,10 @@ auto norm = [](const ROOT::RVec<float> & x, ROOT::RVec<float> & w)
 auto pca_angle = [](const ROOT::RVec<float> & eta, const ROOT::RVec<float> & phi, const ROOT::RVec<float> & e)
 {
   // Shift eta and phi of the constituents accordingly
-  ROOT::RVec<float> deta = shift_eta(eta, e);
-  ROOT::RVec<float> dphi = shift_phi(phi, e);
+  float the_eta_shift = shift_calc(eta, e);
+  float the_phi_shift = shift_calc(phi, e);
+  ROOT::RVec<float> deta = shift_eta(eta, the_eta_shift);
+  ROOT::RVec<float> dphi = shift_phi(phi, the_phi_shift);
 
   // Get total energy of this jet basedon the individual constituents (not corrected)
   float e_tot = ROOT::VecOps::Sum(e);
@@ -183,24 +188,27 @@ int main (int argc, char **argv)
     // Get rotation angle based on PCA
     .Define("fjet_anglePCA", pca_angle, {"fjet_clus_eta","fjet_clus_phi", "fjet_clus_pt"})
     // Sort constituents in decreasing pT
-    .Define("_fjet_sortClus_pt",  sort, {"fjet_clus_pt",  "_fjet_sort_idx"})
-    .Define("_fjet_sortClus_eta", sort, {"fjet_clus_eta", "_fjet_sort_idx"})
-    .Define("_fjet_sortClus_phi", sort, {"fjet_clus_phi", "_fjet_sort_idx"})
-    .Define("_fjet_sortClus_e",   sort, {"fjet_clus_E",   "_fjet_sort_idx"})
-    .Define("fjet_sortClus_m",    mass, {"_fjet_sortClus_pt", "_fjet_sortClus_eta", "_fjet_sortClus_phi", "_fjet_sortClus_e"})
+    .Define("fjet_sortClus_pt",  sort, {"fjet_clus_pt",  "_fjet_sort_idx"})
+    .Define("fjet_sortClus_eta", sort, {"fjet_clus_eta", "_fjet_sort_idx"})
+    .Define("fjet_sortClus_phi", sort, {"fjet_clus_phi", "_fjet_sort_idx"})
+    .Define("fjet_sortClus_e",   sort, {"fjet_clus_E",   "_fjet_sort_idx"})
+    .Define("fjet_sortClus_m",    mass, {"fjet_sortClus_pt", "fjet_sortClus_eta", "fjet_sortClus_phi", "fjet_sortClus_e"})
+    //Calculate component shifts for eta and phi
+    .Define("fjet_etaShift", shift_calc, {"fjet_sortClus_eta", "fjet_sortClus_e"})
+    .Define("fjet_phiShift", shift_calc, {"fjet_sortClus_phi", "fjet_sortClus_e"})
     // Shift components
-    .Define("_fjet_sortClusCenter_eta", shift_eta, {"_fjet_sortClus_eta", "_fjet_sortClus_e"})
-    .Define("_fjet_sortClusCenter_phi", shift_phi, {"_fjet_sortClus_phi", "_fjet_sortClus_e"})
+    .Define("_fjet_sortClusCenter_eta", shift_eta, {"fjet_sortClus_eta", "fjet_sortClus_etaShift"})
+    .Define("_fjet_sortClusCenter_phi", shift_phi, {"fjet_sortClus_phi", "fjet_sortClus_phiShift"})
     // Shift and rotate
     .Define("_fjet_sortClusCenterRot_eta", rot_x, {"_fjet_sortClusCenter_eta", "_fjet_sortClusCenter_phi", "fjet_anglePCA"})
     .Define("fjet_sortClusCenterRot_phi",  rot_y, {"_fjet_sortClusCenter_eta", "_fjet_sortClusCenter_phi", "fjet_anglePCA"})
     // Deterine the parity of this event
-    .Define("fjet_parity", parity, {"_fjet_sortClusCenterRot_eta", "_fjet_sortClus_e"})
+    .Define("fjet_parity", parity, {"_fjet_sortClusCenterRot_eta", "fjet_sortClus_e"})
     // Flip jet based on parity
     .Define("fjet_sortClusCenterRotFlip_eta", flip, {"_fjet_sortClusCenterRot_eta", "fjet_parity"})
     // Normalize scaler components by scaler pT sum
-    .Define("fjet_sortClusNormByPt_pt", norm, {"_fjet_sortClus_pt", "_fjet_sortClus_pt"})
-    .Define("fjet_sortClusNormByPt_e",  norm, {"_fjet_sortClus_e", "_fjet_sortClus_pt"});
+    .Define("fjet_sortClusNormByPt_pt", norm, {"fjet_sortClus_pt", "fjet_sortClus_pt"})
+    .Define("fjet_sortClusNormByPt_e",  norm, {"fjet_sortClus_e", "fjet_sortClus_pt"});
 
   // Check if name of input and output file are identical
   if (fin == fout)
@@ -213,13 +221,6 @@ int main (int argc, char **argv)
   }
   else
     RDF2.Snapshot(treename, fout, drop_cols(RDF2.GetColumnNames()));
-
-// Save some histograms
-//  auto th2_avrg_jet = RDF2.Histo2D({"avrg_jet", "Average jet", 100u, -1, 1, 100u, -1, 1}, "fjet_sortClusCenterRotFlip_eta", "fjet_sortClusCenterRot_phi", "fjet_sortClusNormByE_e");
-//  // Save some histograms to file
-//  TFile f("out.root", "update");
-//  th2_avrg_jet->Write();
-//  f.Close();
 
   return 0;
 }

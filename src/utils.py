@@ -9,7 +9,7 @@ ROOT.PyConfig.IgnoreCommandLineOptions = True
 
 
 def train_weights (signal, pt, n_bins=200):
-  from hep_ml.reweight import BinsReweighter
+  from src.hep_ml.reweight import BinsReweighter
   # Prepate array for weights
   weights = np.ones((len(signal)))
   # Reweight signal and background separately
