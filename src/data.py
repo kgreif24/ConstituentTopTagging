@@ -29,7 +29,7 @@ path2file = os.path.abspath(os.path.dirname(__file__))
 path2home = os.path.join(path2file, "..")
 
 __sec_train__, __sec_valid__ = common.read_conf(os.path.join(path2home, "etc/nomen_est_omen.ini"), "modes", ["training", "validation"])
-__sig_tag__, __train_weight__ = common.read_conf(os.path.join(path2home, "etc/nomen_est_omen.ini"), "variables", ["signalTag", "weightTrain"])
+__sig_tag__, __train_weight__, __match_weight__ = common.read_conf(os.path.join(path2home, "etc/nomen_est_omen.ini"), "variables", ["signalTag", "weightTrain", "weightMatch"])
 
 
 def _n_events (n, n_sig, n_bkg):
@@ -358,7 +358,7 @@ class DataBuilder(src.myutils.walker.Walker):
     subprocess.call("rm %s" % " ".join(files_slim), shell=True)
 
 
-  def _shuffle (self, steps=200):
+  def _shuffle (self, steps=100):
 
     subprocess.call("%s/lib/shuffle/shuffle --path2tmp %s/tmp --fraction 0.01 -t %s --fin %s --fout %s" % (path2home, path2home, self.info["TreeName"], self.fout, self.fout), shell=True)
 
@@ -386,18 +386,24 @@ class DataBuilder(src.myutils.walker.Walker):
 
     # Get the pT as we want a flat pT spectra
     arr = root_numpy.root2array(self.fout, self.info["TreeName"], branches=[pt, "fjet_signal", "fjet_testing_weight_pt"])
-    utils.remove_branch(self.fout, self.info["TreeName"], "fjet_testing_weight_pt")
+    # utils.remove_branch(self.fout, self.info["TreeName"], "fjet_testing_weight_pt")
+
     # Get correction factors for testing weights
     w = utils.correct_weight(arr["fjet_signal"], arr["fjet_testing_weight_pt"])
-    utils.add_branch(self.fout, self.info["TreeName"], w, "fjet_testing_weight_pt")
-    # Compute weights
+    utils.add_branch(self.fout, self.info["TreeName"], w, "fjet_correct_testing_weight_pt")
+
+    # Compute weights to flatten plt spectra
     w = utils.train_weights(arr["fjet_signal"], arr[pt])
     utils.add_branch(self.fout, self.info["TreeName"], w, __train_weight__)
+
+    # Compute weights to match bkg to sig spectra
+    w = utils.match_weights(arr["fjet_signal"], arr[pt])
+    utils.add_branch(self.fout, self.info["TreeName"], w, __match_weight__)
 
     # Some events come with very large weights(?); make a cut
     ROOT.ROOT.EnableImplicitMT(self.n_threads)
     RDF = ROOT.RDataFrame(self.info["TreeName"], self.fout) \
-      .Filter("%s<100" % __train_weight__).Filter("%s<100" % "fjet_testing_weight_pt") \
+      .Filter("%s<100" % __train_weight__).Filter("%s<100" % "fjet_correct_testing_weight_pt") \
       .Snapshot(self.info["TreeName"], self.fout.replace(".root", ".limit_weights.root"))
     subprocess.call("mv %s %s" % (self.fout.replace(".root", ".limit_weights.root"), self.fout), shell=True)
  

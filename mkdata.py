@@ -120,9 +120,6 @@ def _run ():
   # Start building the data set; this may take a while.
   db.build()
 
-  # Finally, make a histogram for each branch in the final data set
-  db.inspect(outdir="out/data")
-
 
 if __name__ == "__main__":
   _run()

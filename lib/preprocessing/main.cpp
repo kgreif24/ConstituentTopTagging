@@ -80,11 +80,12 @@ auto flip = [](const ROOT::RVec<float> & x, const int & par)
   return par * x;
 };
 
-
-auto norm = [](const ROOT::RVec<float> & x, ROOT::RVec<float> & w)
+auto standardize = [](const ROOT::RVec<float> & x)
 {
+  float x_mean = ROOT::VecOps::Mean(x);
+  float x_stddev = ROOT::VecOps::StdDev(x);
   ROOT::RVec<float> x_norm(x);
-  return x_norm / ROOT::VecOps::Sum(w);
+  return (x_norm - x_mean) / x_stddev;
 };
 
 
@@ -197,8 +198,8 @@ int main (int argc, char **argv)
     .Define("fjet_etaShift", shift_calc, {"fjet_sortClus_eta", "fjet_sortClus_e"})
     .Define("fjet_phiShift", shift_calc, {"fjet_sortClus_phi", "fjet_sortClus_e"})
     // Shift components
-    .Define("_fjet_sortClusCenter_eta", shift_eta, {"fjet_sortClus_eta", "fjet_sortClus_etaShift"})
-    .Define("_fjet_sortClusCenter_phi", shift_phi, {"fjet_sortClus_phi", "fjet_sortClus_phiShift"})
+    .Define("_fjet_sortClusCenter_eta", shift_eta, {"fjet_sortClus_eta", "fjet_etaShift"})
+    .Define("_fjet_sortClusCenter_phi", shift_phi, {"fjet_sortClus_phi", "fjet_phiShift"})
     // Shift and rotate
     .Define("_fjet_sortClusCenterRot_eta", rot_x, {"_fjet_sortClusCenter_eta", "_fjet_sortClusCenter_phi", "fjet_anglePCA"})
     .Define("fjet_sortClusCenterRot_phi",  rot_y, {"_fjet_sortClusCenter_eta", "_fjet_sortClusCenter_phi", "fjet_anglePCA"})
@@ -207,8 +208,8 @@ int main (int argc, char **argv)
     // Flip jet based on parity
     .Define("fjet_sortClusCenterRotFlip_eta", flip, {"_fjet_sortClusCenterRot_eta", "fjet_parity"})
     // Normalize scaler components by scaler pT sum
-    .Define("fjet_sortClusNormByPt_pt", norm, {"fjet_sortClus_pt", "fjet_sortClus_pt"})
-    .Define("fjet_sortClusNormByPt_e",  norm, {"fjet_sortClus_e", "fjet_sortClus_pt"});
+    .Define("fjet_sortClusStan_pt", standardize, {"fjet_sortClus_pt"})
+    .Define("fjet_sortClusStan_e",  standardize, {"fjet_sortClus_e"});
 
   // Check if name of input and output file are identical
   if (fin == fout)

@@ -29,6 +29,20 @@ def train_weights (signal, pt, n_bins=200):
     weights[msk] /= weights[msk].mean()
   return weights
 
+def match_weights(signal_flag, pt, n_bins=200):
+  from src.hep_ml.reweight import BinsReweighter
+  # Initialize weights array
+  weights = np.ones((len(signal_flag)))
+  # Get signal/background
+  signal = pt[signal_flag == 1]
+  background = pt[signal_flag == 0]
+  # Now fit bins-reweighter
+  reweighter = BinsReweighter(n_bins=n_bins)
+  reweighter.fit(background, target=signal)
+  # Predict weights
+  weights_tmp = reweighter.predict_weights(background)
+  weights[signal_flag == 0] = weights_tmp / weights_tmp.mean()
+  return weights
 
 def correct_weight (signal, weights):
   # Reweight signal and background separately
