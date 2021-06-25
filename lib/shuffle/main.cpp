@@ -104,12 +104,6 @@ int main (int argc, char **argv)
   auto RDF_merge = ROOT::RDataFrame(treename, fNames).Snapshot(treename, fout);
   std::cout << "[INFO] The following file has been saved: " << fout << std::endl;
 
-  // Debug, stop here to see if tmp files actually exist!
-  if (fout == "datagen_out.root") {
-    std::cout << "Made it to stop switch, hope for the best! " << std::endl;
-    return 0;
-  }
-
   // Delete temporary files
   for (auto & el : fNames)
     if (std::remove(el.c_str()) != 0)
