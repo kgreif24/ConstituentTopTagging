@@ -43,19 +43,65 @@ class DataDumper():
         # Separate out train/valid trees. REFACTOR!!!
         tree = input_file[tree_name]
 
-        # Initialize list of ak arrays
-        self.ak_list = []
+        # Initialize dict of ak arrays
+        self.ak_dict = {}
 
-        # Loop over branches list and push awkward array into ak_list
+        # Loop over branches list and push awkward array into ak_dict
         for branch_name in branches:
-            self.ak_list.append(tree[branch_name].array())
+            self.ak_dict[branch_name] = tree[branch_name].array()
 
         # Arrays should have all equal first dimension, which is number of
         # events. Find this number
-        self.num_events = len(self.ak_list[0])
+        self.num_events = len(tree[branches[0]])
 
         # Finally extract labels from tree. Natively store these as numpy
         self.labels = ak.to_numpy(tree[signal_name].array())
+
+    def plot_branches(self, branches, log=True, directory=None):
+        """ plot_branches - This function takes in a list of strings that are
+        the names of branches to be plotted. It then either displays
+        a histogram of these branches or saves a .png of the histogram to a
+        directory.
+
+        Arguments:
+            branches (list): List of strings containing branch names
+            signal (string): Key of signal branch in ak_dict
+            log (bool): Plot on a log scale
+            directory (string): Path of directory to save histograms in.
+            If not set, display histograms
+
+        Returns:
+            None
+        """
+
+        # Loop through list of branches to plot
+        for branch_name in branches:
+
+            # Pull branch from ak_dict
+            thisBranch = self.ak_dict[branch_name]
+
+            # Separate signal and background
+            print(ak.type(thisBranch))
+            thisBranchSig = thisBranch[self.labels == 1, :]
+            thisBranchBkg = thisBranch[self.labels == 0, :]
+
+            # Call ak.flatten to remove all structure from array
+            thisBranchSig = ak.flatten(thisBranchSig)
+            thisBranchBkg = ak.flatten(thisBranchBkg)
+
+            # Can now make a histogram
+            plt.hist(thisBranchSig, alpha=0.5, label='Signal')
+            plt.hist(thisBranchBkg, alpha=0.5, label='Background')
+            if log:
+                plt.yscale('log')
+            plt.title(branch_name)
+            plt.legend()
+            if directory != None:
+                filename = directory + branch_name + ".png"
+                plt.savefig(filename, dpi=300)
+            else:
+                plt.show()
+
 
     def to_categorical(self, num_classes):
         """ to_categorical - Sends self.labels to a one-hot encoded numpy array.
@@ -82,22 +128,19 @@ class DataDumper():
             None
         """
 
-        # Initialize new list and set max_constits to instance variable
-        padded_list = []
+        # Set max_constits to instance variable
         self.max_constits = max_constits
 
-        # Loop through ak_list
-        for data_feature in self.ak_list:
+        # Loop through ak_dict
+        for key, data_feature in self.ak_dict.items():
 
             # Pad with None values, and then replace None with 0's
             df_none = ak.pad_none(data_feature, max_constits, axis=1, clip=True)
             df_zero = ak.fill_none(df_none, 0)
 
-            # Append to padded_list
-            padded_list.append(df_zero)
+            # Set ak_dict entry to df_zero
+            self.ak_dict[key] = df_zero
 
-        # Redefine ak_list
-        self.ak_list = padded_list
 
     def numpy_stack(self):
         """ numpy_stack - Return data as a single numpy array, stacked in
@@ -110,12 +153,12 @@ class DataDumper():
             (array): Stacked data
         """
 
-        # First convert all elements of ak_list to numpy (requires they
+        # First convert all elements of ak_dict to numpy (requires they
         # all be rectangular!!). Also convert to float32 for pytorch usage
-        self.ak_list = [ak.to_numpy(df).astype('float32') for df in self.ak_list]
+        self.ak_dict = {key: ak.to_numpy(df).astype('float32') for key, df in self.ak_dict.items()}
 
-        # Now call np.dstack
-        return np.dstack(tuple(self.ak_list))
+        # Now call np.dstack on values of dict
+        return np.dstack(tuple(self.ak_dict.values()))
 
     def torch_dataloader(self, **kwargs):
         """ torch_dataloader - Packages data and labels into a torch data-
@@ -148,7 +191,7 @@ class DataDumper():
         Returns:
             (tuple): The shape of each sample as a tuple
         """
-        return (self.max_constits, len(self.ak_list))
+        return (self.max_constits, len(self.ak_dict))
 
 if __name__ == '__main__':
 
@@ -157,9 +200,12 @@ if __name__ == '__main__':
                 'fjet_sortClusCenterRot_phi', 'fjet_sortClusNormByPt_e']
     my_dump = DataDumper("../Data/unshuf_test.root", "train", my_branches, 'fjet_signal')
 
+    my_dump.plot_branches(my_branches)
+
     my_dump.to_categorical(2)
 
     my_dump.pad_zeros(80)
 
     torch_dl = my_dump.torch_dataloader(batch_size=100, shuffle=True)
     print(len(torch_dl))
+    print(my_dump.sample_shape())
