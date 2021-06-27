@@ -15,8 +15,8 @@ import data_dumper
 
 class ClassifierTrainer():
     """ ClassifierTrainer - This class will handle the training and validation
-    of a classifier written in pytorch. Meant for use on the top tagging
-    dataset.
+    of a classifier written in pytorch, and also provide methods for saving
+    and loading models. Meant for use on the top tagging dataset.
     """
 
     def __init__(self, model, optimizer, loss_function):
@@ -69,12 +69,39 @@ class ClassifierTrainer():
         else:
             raise ValueError("Flag must be either 1, 2, or 3!")
 
-    def train(self, n_epochs, validate=True):
+    def save_model(self, filePath):
+        """ save_model - Save the model parameters at the given file path.
+
+        Arguments:
+            filePath (string): The path at which to save the model
+
+        Returns:
+            None
+        """
+        torch.save(self.model.state_dict(), filePath)
+
+    def load_model(self, filePath):
+        """ load_model - Load the state dict save at filePath into the model
+        currently store in the trainer. Model must already be initialized and
+        have the correct architecture to load the state dict.
+
+        Arguments:
+            filePath (string): Path to file to load state dict from
+
+        Returns:
+            None
+        """
+        self.model.load_state_dict(torch.load(filePath))
+
+    def train(self, n_epochs, validate=True, checkpoints=None):
         """ train - Actually train the network for the given number of epochs.
 
         Arguments:
             n_epochs (int): The number of epochs to train for
             validate (bool): Set to false to disable validation
+            checkpoints (string): If given, save model checkpoints as .pt files
+            in the directory pointed to by this string. Model will be saved
+            at the end of every epoch
 
         Returns:
             None
@@ -84,8 +111,10 @@ class ClassifierTrainer():
         self.tr_loss_array = np.zeros(n_epochs)
         self.val_loss_array = np.zeros(n_epochs)
 
+        print("######## START TRAINING LOOP ########")
         # The training loop
         for epoch in range(n_epochs):
+            print("\nNow starting epoch", str(epoch), "of", str(n_epochs))
 
             # Put model in training mode
             self.model.train()
@@ -119,6 +148,16 @@ class ClassifierTrainer():
             # Now validate if necessary!
             if validate:
                 self.validate(epoch)
+
+            # And save model if desired
+            if checkpoints != None:
+                filename = "/checkpt_e" + str(epoch) + ".pt"
+                path  = checkpoints + filename
+                self.save_model(path)
+
+            # Lastly print losses
+            print("--Training loss: ", str(self.tr_loss_array[epoch]))
+            print("--Validation loss: ", str(self.val_loss_array[epoch]))
 
     def validate(self, epoch=None):
         """ validate - Validate the model, usually in the course of training.

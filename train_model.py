@@ -27,12 +27,8 @@ dd_train = data_dumper.DataDumper("../Data/unshuf_test.root", "train",
                                    constit_branches, 'fjet_signal')
 dd_valid = data_dumper.DataDumper("../Data/unshuf_test.root", "valid",
                                    constit_branches, 'fjet_signal')
-dd_train.pad_zeros(max_constits)
-dd_valid.pad_zeros(max_constits)
-dd_train.to_categorical(2)      # Hardcode number of classes
-dd_valid.to_categorical(2)
-train_dl = dd_train.torch_dataloader(batch_size=my_batch_size, shuffle=True)
-valid_dl = dd_train.torch_dataloader(batch_size=my_batch_size, shuffle=True)
+train_dl = dd_train.torch_dataloader(max_constits=80, batch_size=my_batch_size, shuffle=True)
+valid_dl = dd_train.torch_dataloader(max_constits=80, batch_size=my_batch_size, shuffle=True)
 
 # Find shape of each mini batch
 sample_shape = tuple([my_batch_size]) + dd_train.sample_shape()
@@ -53,10 +49,11 @@ model_trainer.load_data(train_dl, flag=1)
 model_trainer.load_data(valid_dl, flag=2)
 
 # Train the model
-model_trainer.train(n_epochs, validate=True)
+checkptDir = "./dnn/training/test1"
+model_trainer.train(n_epochs, validate=True, checkpoints=checkptDir)
 
 # Show some simple results
-print("Final train loss: ", model_trainer.tr_loss_array[-1])
+print("\nFinal train loss: ", model_trainer.tr_loss_array[-1])
 print("Final valid loss: ", model_trainer.val_loss_array[-1])
 
 plt.plot(model_trainer.tr_loss_array)

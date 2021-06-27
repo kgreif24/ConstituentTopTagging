@@ -81,7 +81,6 @@ class DataDumper():
             thisBranch = self.ak_dict[branch_name]
 
             # Separate signal and background
-            print(ak.type(thisBranch))
             thisBranchSig = thisBranch[self.labels == 1, :]
             thisBranchBkg = thisBranch[self.labels == 0, :]
 
@@ -102,81 +101,42 @@ class DataDumper():
             else:
                 plt.show()
 
-
-    def to_categorical(self, num_classes):
-        """ to_categorical - Sends self.labels to a one-hot encoded numpy array.
-        Array will have float datatype for usage with pytorch loss functions.
-
-        Arguments:
-            num_classes (int) - The number of classes to use in 1-hot encoding
-
-        Returns:
-            None
-        """
-
-        self.labels =  np.eye(num_classes, dtype='float32')[self.labels]
-
-    def pad_zeros(self, max_constits):
-        """ pad_zeros - This function will loop through awkward arrays in
-        ak_list and pad with zeros so their shape is rectangular.
-
-        Arguments:
-            max_constits (int): The maximum number of constituents to have in
-            a single event
-
-        Returns:
-            None
-        """
-
-        # Set max_constits to instance variable
-        self.max_constits = max_constits
-
-        # Loop through ak_dict
-        for key, data_feature in self.ak_dict.items():
-
-            # Pad with None values, and then replace None with 0's
-            df_none = ak.pad_none(data_feature, max_constits, axis=1, clip=True)
-            df_zero = ak.fill_none(df_none, 0)
-
-            # Set ak_dict entry to df_zero
-            self.ak_dict[key] = df_zero
-
-
-    def numpy_stack(self):
-        """ numpy_stack - Return data as a single numpy array, stacked in
-        innermost dimension using the dstack function.
-
-        Arguments:
-            None
-
-        Returns:
-            (array): Stacked data
-        """
-
-        # First convert all elements of ak_dict to numpy (requires they
-        # all be rectangular!!). Also convert to float32 for pytorch usage
-        self.ak_dict = {key: ak.to_numpy(df).astype('float32') for key, df in self.ak_dict.items()}
-
-        # Now call np.dstack on values of dict
-        return np.dstack(tuple(self.ak_dict.values()))
-
-    def torch_dataloader(self, **kwargs):
+    def torch_dataloader(self, max_constits=80, **kwargs):
         """ torch_dataloader - Packages data and labels into a torch data-
-        loader which can be used for training a model.
+        loader which can be used for training a model. Takes in maximum
+        number of constituents to be passed in each jet.
 
         Arguments:
-            None
+            max_constits (int): Number of constituents to be passed
 
         Returns:
             (torch.utils.data.DataLoader)
         """
 
-        # First make a rectangular array of training data using numpy_stack
-        data = self.numpy_stack()
+        # First send all of the labels to a 1 hot encoded
+        # array. Hardcode 2 classes (signal, background)
+        cat_labels =  np.eye(2, dtype='float32')[self.labels]
+
+        # Next pad jets with less than the maximum number of constituents
+        # with 0's, and trucate jets with more than the maximum.
+        self.max_constits = max_constits
+        # Loop through ak_dict
+        for key, data_feature in self.ak_dict.items():
+            # Pad with None values, and then replace None with 0's
+            df_none = ak.pad_none(data_feature, max_constits, axis=1, clip=True)
+            df_zero = ak.fill_none(df_none, 0)
+            # Set ak_dict entry to df_zero
+            self.ak_dict[key] = df_zero
+
+        # Now combine features in ak_dict into a rectangular array using
+        # numpy.stack. First convert to numpy
+        np_dict = {key: ak.to_numpy(df).astype('float32') for key, df in self.ak_dict.items()}
+        # Call numpy.stack
+        data = np.dstack(tuple(np_dict.values()))
 
         # Now make torch tensors
         data_torch = torch.from_numpy(data)
-        label_torch = torch.from_numpy(self.labels)
+        label_torch = torch.from_numpy(cat_labels)
 
         # And return DataLoader
         dataset = torch.utils.data.TensorDataset(data_torch, label_torch)
@@ -196,16 +156,12 @@ class DataDumper():
 if __name__ == '__main__':
 
     # Some simple test code for this class
-    my_branches = ['fjet_sortClusNormByPt_pt', 'fjet_sortClusCenterRotFlip_eta',
-                'fjet_sortClusCenterRot_phi', 'fjet_sortClusNormByPt_e']
-    my_dump = DataDumper("../Data/unshuf_test.root", "train", my_branches, 'fjet_signal')
+    my_branches = ['fjet_sortClusStan_pt', 'fjet_sortClusCenterRotFlip_eta',
+                'fjet_sortClusCenterRot_phi', 'fjet_sortClusStan_e']
+    my_dump = DataDumper("../Data/sample_1M.root", "train", my_branches, 'fjet_signal')
 
-    my_dump.plot_branches(my_branches)
+    # my_dump.plot_branches(my_branches)
 
-    my_dump.to_categorical(2)
-
-    my_dump.pad_zeros(80)
-
-    torch_dl = my_dump.torch_dataloader(batch_size=100, shuffle=True)
+    torch_dl = my_dump.torch_dataloader(max_constits=80, batch_size=100, shuffle=True)
     print(len(torch_dl))
     print(my_dump.sample_shape())
