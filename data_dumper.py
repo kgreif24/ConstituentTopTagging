@@ -76,21 +76,24 @@ class DataDumper():
 
         # Loop through list of branches to plot
         for branch_name in branches:
+            print("Now plotting", branch_name)
 
             # Pull branch from ak_dict
             thisBranch = self.ak_dict[branch_name]
 
             # Separate signal and background
-            thisBranchSig = thisBranch[self.labels == 1, :]
-            thisBranchBkg = thisBranch[self.labels == 0, :]
+            thisBranchSig = thisBranch[self.labels == 1, ...]
+            thisBranchBkg = thisBranch[self.labels == 0, ...]
 
-            # Call ak.flatten to remove all structure from array
-            thisBranchSig = ak.flatten(thisBranchSig)
-            thisBranchBkg = ak.flatten(thisBranchBkg)
+            # Call ak.flatten to remove all structure from array if needed
+            typestr = str(ak.type(thisBranch))
+            if 'var' in typestr:
+                thisBranchSig = ak.flatten(thisBranchSig)
+                thisBranchBkg = ak.flatten(thisBranchBkg)
 
             # Can now make a histogram
-            plt.hist(thisBranchSig, alpha=0.5, label='Signal')
-            plt.hist(thisBranchBkg, alpha=0.5, label='Background')
+            n, bins, patches = plt.hist(thisBranchBkg, alpha=0.5, label='Background')
+            plt.hist(thisBranchSig, bins=bins, alpha=0.5, label='Signal')
             if log:
                 plt.yscale('log')
             plt.title(branch_name)
@@ -98,6 +101,7 @@ class DataDumper():
             if directory != None:
                 filename = directory + branch_name + ".png"
                 plt.savefig(filename, dpi=300)
+                plt.clf()
             else:
                 plt.show()
 
