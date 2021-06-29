@@ -52,7 +52,7 @@ class DataDumper():
 
         # Arrays should have all equal first dimension, which is number of
         # events. Find this number
-        self.num_events = len(tree[branches[0]])
+        self.num_events = len(self.ak_dict[branch_name])
 
         # Finally extract labels from tree. Natively store these as numpy
         self.labels = ak.to_numpy(tree[signal_name].array())
@@ -160,12 +160,14 @@ class DataDumper():
 if __name__ == '__main__':
 
     # Some simple test code for this class
-    my_branches = ['fjet_sortClusStan_pt', 'fjet_sortClusCenterRotFlip_eta',
-                'fjet_sortClusCenterRot_phi', 'fjet_sortClusStan_e']
-    my_dump = DataDumper("../Data/sample_1M.root", "train", my_branches, 'fjet_signal')
+    my_branches = ['fjet_sortClusNormByPt_pt', 'fjet_sortClusCenterRotFlip_eta',
+                'fjet_sortClusCenterRot_phi', 'fjet_sortClusNormByPt_e']
+    my_dump = DataDumper("../Data/unshuf_test.root", "train", my_branches, 'fjet_signal')
 
     # my_dump.plot_branches(my_branches)
 
     torch_dl = my_dump.torch_dataloader(max_constits=80, batch_size=100, shuffle=True)
     print(len(torch_dl))
     print(my_dump.sample_shape())
+    print(my_dump.num_events)
+    print(torch_dl.dataset.tensors[1].numpy())

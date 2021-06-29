@@ -8,6 +8,7 @@ python3
 """
 
 import torch
+import sklearn.metrics as metrics
 import matplotlib.pyplot as plt
 import numpy as np
 import data_dumper
@@ -56,16 +57,21 @@ class ClassifierTrainer():
             None
         """
 
-        # Set dataloader to appropriate value based on flag
+        # Set dataloader to appropriate value based on flag. Also write the
+        # length of the dataloader and the total number of events. Kind of a
+        # hack to pull 2nd tensor out of dataloader which is always labels array
         if flag == 1:
             self.train_data = torch_dl
             self.tr_batch_per_epoch = len(torch_dl)
+            self.tr_total_events = len(torch_dl.dataset.tensors[1])
         elif flag == 2:
             self.valid_data = torch_dl
             self.val_batch_per_epoch = len(torch_dl)
+            self.val_total_events = len(torch_dl.dataset.tensors[1])
         elif flag == 3:
             self.test_data = torch_dl
             self.test_batch_per_epoch = len(torch_dl)
+            self.test_total_events = len(torch_dl.dataset.tensors[1])
         else:
             raise ValueError("Flag must be either 1, 2, or 3!")
 
@@ -162,7 +168,7 @@ class ClassifierTrainer():
         # Print end of training loop
         print("\n######## END TRAINING LOOP ########")
 
-    def validate(self, epoch=None):
+    def validate(self, epoch=None, predictions=False):
         """ validate - Validate the model, usually in the course of training.
         This function simply calculates the validation loss and writes it
         to val_loss_array.
@@ -170,16 +176,26 @@ class ClassifierTrainer():
         Arguments:
             epoch (int) - The epoch in val_loss_array at which to write
             validation loss. If left at None, just print validation loss.
+            predictions (bool) - If set to true, return the model output and labels
+            in a tuple object
 
         Returns:
-            None
+            (tuple) - Model output and label arrays stored in a tuple, if
+            predictions flag is set to true.
         """
 
         # Put model in evaluation mode
         self.model.eval()
 
-        # Initialize loss counter
+        # Initialize loss counter and output arrays if necessary
         val_loss = 0
+
+        if predictions:
+            output_array = np.zeros(self.val_total_events)
+            label_array = np.zeros(self.val_total_events)
+            # This is duplicating labels, but easier than getting them out of
+            # dataloader given we would need to undo one-hot encoding.
+            event_index = 0
 
         for i, data in enumerate(self.valid_data):
 
@@ -194,9 +210,61 @@ class ClassifierTrainer():
             loss = self.loss_function(output, label)
             val_loss += loss
 
+            # Write output and labels to arrays if necessary. This is terrible
+            # code, clean this up if frequently used!
+            if predictions:
+                signal_scores = output[:,1].detach().numpy()
+                signal_labels= label[:,1].detach().numpy()
+                event_end_index = event_index + len(signal_scores)
+                output_array[event_index:event_end_index] = signal_scores
+                label_array[event_index:event_end_index] = signal_labels
+                event_index = event_end_index
+
         # Write validation loss to array, or print as desired
         avg_val_loss = val_loss / self.val_batch_per_epoch
         if epoch != None:
             self.val_loss_array[epoch] = avg_val_loss
         else:
-            print("Validation loss: ", avg_val_loss)
+            print("Validation loss: ", float(avg_val_loss))
+
+        # Return output and label array if predictions is set to true
+        if predictions:
+            return (output_array, label_array)
+
+    def analyze(self, filename=None):
+        """ analyze - This function will calculate the AUC of the model over
+        the validation set, and generate a roc curve and a histogram of the
+        network output.
+
+        Arguments:
+            filename (string) - Filename at which to save plots. If none is
+            given, simply display plots.
+
+        Returns:
+            None
+        """
+
+        print("\n\n######## ANALYZE MODEL ########")
+
+        # First get model predictions for validation set using validate
+        output, labels = self.validate(predictions=True)
+
+        # Now calculate and print AUC
+        auc_score = metrics.roc_auc_score(labels, output)
+        print("AUC score over validation set: ", auc_score)
+
+        # Make a histogram of the model output
+        output_sig = output[labels == 1]
+        output_bkg = output[labels == 0]
+        hist_bins = np.linspace(0, 1.0, 100)
+        plt.hist(output_sig, bins=hist_bins, alpha=0.5, label='Signal')
+        plt.hist(output_bkg, bins=hist_bins, alpha=0.5, label='Background')
+        plt.legend()
+        plt.ylabel("Counts")
+        plt.xlabel("Signal class score")
+        plt.title("DNN Output over Validation Set")
+        if filename != None:
+            plt.savefig(filename, dpi=300)
+            plt.clf()
+        else:
+            plt.show()

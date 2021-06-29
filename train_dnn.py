@@ -23,7 +23,7 @@ constit_branches = ['fjet_sortClusNormByPt_pt', 'fjet_sortClusCenterRotFlip_eta'
                     'fjet_sortClusCenterRot_phi', 'fjet_sortClusNormByPt_e']
 
 # Build datadumper and return pytorch dataloader object
-print("\nBuilding data objects...") 
+print("\nBuilding data objects...")
 dd_train = data_dumper.DataDumper("/data/homezvol0/kgreif/toptag/samples/unshuf_test.root", "train",
                                    constit_branches, 'fjet_signal')
 dd_valid = data_dumper.DataDumper("/data/homezvol0/kgreif/toptag/samples/unshuf_test.root", "valid",
@@ -50,8 +50,11 @@ model_trainer = classifier_trainer.ClassifierTrainer(model, optimizer, loss_func
 model_trainer.load_data(train_dl, flag=1)
 model_trainer.load_data(valid_dl, flag=2)
 
+# Analyze the model before training
+model_trainer.analyze()
+
 # Train the model
-model_trainer.train(n_epochs, validate=True, checkpoints="./checkpoints")
+model_trainer.train(n_epochs, validate=True, checkpoints=None)
 
 # Show some simple results
 print("\nFinal train loss: ", model_trainer.tr_loss_array[-1])
@@ -66,3 +69,6 @@ plt.xlabel("Epoch")
 plt.ylabel("BCE Loss")
 plt.savefig("./plots/loss.png", dpi=300)
 plt.clf()
+
+# Finally analyze the model after training
+model_trainer.analyze()
