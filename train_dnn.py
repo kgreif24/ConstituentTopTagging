@@ -23,9 +23,10 @@ constit_branches = ['fjet_sortClusNormByPt_pt', 'fjet_sortClusCenterRotFlip_eta'
                     'fjet_sortClusCenterRot_phi', 'fjet_sortClusNormByPt_e']
 
 # Build datadumper and return pytorch dataloader object
-dd_train = data_dumper.DataDumper("../Data/unshuf_test.root", "train",
+print("\nBuilding data objects...") 
+dd_train = data_dumper.DataDumper("/data/homezvol0/kgreif/toptag/samples/unshuf_test.root", "train",
                                    constit_branches, 'fjet_signal')
-dd_valid = data_dumper.DataDumper("../Data/unshuf_test.root", "valid",
+dd_valid = data_dumper.DataDumper("/data/homezvol0/kgreif/toptag/samples/unshuf_test.root", "valid",
                                    constit_branches, 'fjet_signal')
 train_dl = dd_train.torch_dataloader(max_constits=80, batch_size=my_batch_size, shuffle=True)
 valid_dl = dd_train.torch_dataloader(max_constits=80, batch_size=my_batch_size, shuffle=True)
@@ -35,6 +36,7 @@ sample_shape = tuple([my_batch_size]) + dd_train.sample_shape()
 input_shape = sample_shape[1] * sample_shape[2]
 
 # Now build the model!
+print("\nBuilding model...")
 model = simpleDNN(input_shape)
 
 # Build optimizer and loss function
@@ -49,13 +51,18 @@ model_trainer.load_data(train_dl, flag=1)
 model_trainer.load_data(valid_dl, flag=2)
 
 # Train the model
-checkptDir = "./dnn/training/test1"
-model_trainer.train(n_epochs, validate=True, checkpoints=checkptDir)
+model_trainer.train(n_epochs, validate=True, checkpoints="./checkpoints")
 
 # Show some simple results
 print("\nFinal train loss: ", model_trainer.tr_loss_array[-1])
 print("Final valid loss: ", model_trainer.val_loss_array[-1])
 
-plt.plot(model_trainer.tr_loss_array)
-plt.plot(model_trainer.val_loss_array)
-plt.show()
+# Plot loss and save figure
+plt.plot(model_trainer.tr_loss_array, label="Training")
+plt.plot(model_trainer.val_loss_array, label="Validation")
+plt.title("Loss for DNN training")
+plt.legend()
+plt.xlabel("Epoch")
+plt.ylabel("BCE Loss")
+plt.savefig("./plots/loss.png", dpi=300)
+plt.clf()

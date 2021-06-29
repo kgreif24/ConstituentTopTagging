@@ -111,7 +111,7 @@ class ClassifierTrainer():
         self.tr_loss_array = np.zeros(n_epochs)
         self.val_loss_array = np.zeros(n_epochs)
 
-        print("######## START TRAINING LOOP ########")
+        print("\n######## START TRAINING LOOP ########")
         # The training loop
         for epoch in range(n_epochs):
             print("\nNow starting epoch", str(epoch), "of", str(n_epochs))
@@ -158,6 +158,9 @@ class ClassifierTrainer():
             # Lastly print losses
             print("--Training loss: ", str(self.tr_loss_array[epoch]))
             print("--Validation loss: ", str(self.val_loss_array[epoch]))
+
+        # Print end of training loop
+        print("\n######## END TRAINING LOOP ########")
 
     def validate(self, epoch=None):
         """ validate - Validate the model, usually in the course of training.
