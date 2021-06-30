@@ -10,15 +10,39 @@ python3
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
+import argparse
 import data_dumper
 import classifier_trainer
 from dnn.simple_dnn import simpleDNN
 
 
+# Parse command line arguments
+parser = argparse.ArgumentParser()
+
+parser.add_argument('--enableCuda', action='store_true',
+                    help='Enable CUDA')
+parser.add_argument('-N', '--numEpochs', default=100, type=int,
+                    help='Number of epochs')
+parser.add_argument('-b', '--batchSize', default=100, type=int,
+                    help='Batch size')
+parser.add_argument('--maxConstits', default=80, type=int,
+                    help='Number of constituents to include per event')
+parser.add_argument('-o', '--checkDir', default='./checkpoints', type=str,
+                    help='Stem of file name at which to save checkpoints')
+args = parser.parse_args()
+
+# Find device
+args.device = None
+useCuda = args.enableCuda and torch.cuda.is_available()
+if useCuda:
+    args.device = torch.device('cuda')
+else:
+    args.device = torch.device('cpu')
+
 # Start by setting some training parameters
-n_epochs = 100
-my_batch_size = 100
-max_constits = 80
+n_epochs = args.numEpochs
+my_batch_size = args.batchSize
+my_max_constits = args.maxConstits
 constit_branches = ['fjet_sortClusStan_pt', 'fjet_sortClusCenterRotFlip_eta',
                     'fjet_sortClusCenterRot_phi', 'fjet_sortClusStan_e']
 
@@ -28,8 +52,8 @@ dd_train = data_dumper.DataDumper("/data/homezvol0/kgreif/toptag/samples/sample_
                                    constit_branches, 'fjet_signal')
 dd_valid = data_dumper.DataDumper("/data/homezvol0/kgreif/toptag/samples/sample_1M.root", "valid",
                                    constit_branches, 'fjet_signal')
-train_dl = dd_train.torch_dataloader(max_constits=80, batch_size=my_batch_size, shuffle=True)
-valid_dl = dd_train.torch_dataloader(max_constits=80, batch_size=my_batch_size, shuffle=True)
+train_dl = dd_train.torch_dataloader(max_constits=my_max_constits, batch_size=my_batch_size, shuffle=True)
+valid_dl = dd_train.torch_dataloader(max_constits=my_max_constits, batch_size=my_batch_size, shuffle=True)
 
 # Find shape of each mini batch
 sample_shape = tuple([my_batch_size]) + dd_train.sample_shape()
@@ -37,7 +61,7 @@ input_shape = sample_shape[1] * sample_shape[2]
 
 # Now build the model!
 print("\nBuilding model...")
-model = simpleDNN(input_shape)
+model = simpleDNN(input_shape).to(device=args.device)
 
 # Build optimizer and loss function
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
@@ -51,10 +75,13 @@ model_trainer.load_data(train_dl, flag=1)
 model_trainer.load_data(valid_dl, flag=2)
 
 # Analyze the model before training
-model_trainer.analyze(filename="./plots/initial_output.png")
+model_trainer.analyze(filename="./plots/initial_output.png", my_device=args.device)
 
 # Train the model
-min_loss_index = model_trainer.train(n_epochs, validate=True, checkpoints="./checkpoints")
+min_loss_index = model_trainer.train(n_epochs,
+                                     my_device=args.device,
+                                     validate=True,
+                                     checkpoints=args.checkDir)
 
 # Show some simple results
 print("\nFinal train loss: ", model_trainer.tr_loss_array[min_loss_index])
@@ -71,7 +98,8 @@ plt.savefig("./plots/loss.png", dpi=300)
 plt.clf()
 
 # Load in model with the best training loss
-model_trainer.load_model("./checkpoints/checkpt_e" + str(min_loss_index) + ".pt")
+filestr = args.checkDir + "/checkpt_e" + str(min_loss_index) + ".pt"
+model_trainer.load_model(filestr)
 
 # Finally analyze the model after training
-model_trainer.analyze(filename="./plots/final_output.png")
+model_trainer.analyze(filename="./plots/final_output.png", my_device=args.device)

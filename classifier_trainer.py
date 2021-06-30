@@ -101,11 +101,13 @@ class ClassifierTrainer():
         """
         self.model.load_state_dict(torch.load(filePath))
 
-    def train(self, n_epochs, validate=True, checkpoints=None):
+    def train(self, n_epochs, my_device=None, validate=True, checkpoints=None):
         """ train - Actually train the network for the given number of epochs.
 
         Arguments:
             n_epochs (int): The number of epochs to train for
+            my_device (torch.device): The device to use, either 'cuda' for GPU
+            or 'cpu' otherwise. Usually set by command line argument
             validate (bool): Set to false to disable validation
             checkpoints (string): If given, save model checkpoints as .pt files
             in the directory pointed to by this string. Model will be saved
@@ -138,6 +140,10 @@ class ClassifierTrainer():
                 # Pull sample and labels from data array, and flatten sample
                 sample, label = data
                 sample = torch.flatten(sample, start_dim=1, end_dim=2)
+
+                # Send sample to correct device
+                sample = sample.to(device=my_device)
+                label = sample.to(device=my_device)
 
                 # Zero gradients
                 self.optimizer.zero_grad()
@@ -176,11 +182,11 @@ class ClassifierTrainer():
             print("--Training loss: ", str(self.tr_loss_array[epoch]))
             print("--Validation loss: ", str(self.val_loss_array[epoch]))
 
-            # Lastly we want to exit training loop if training loss has not decreased 
+            # Lastly we want to exit training loop if training loss has not decreased
             # in the last 5 epochs, (after first 6 epochs)
             if epoch > 5:
                 if min_loss < np.min(self.tr_loss_array[epoch-5:epoch+1]):
-                    
+
                     # Trim loss arrays so they don't have trailing zeros
                     self.tr_loss_array = np.trim_zeros(self.tr_loss_array, trim='b')
                     self.val_loss_array = np.trim_zeros(self.val_loss_array, trim='b')
@@ -196,12 +202,15 @@ class ClassifierTrainer():
         # Return index
         return min_loss_epoch
 
-    def validate(self, epoch=None, predictions=False):
+    def validate(self, my_device=None, epoch=None, predictions=False):
         """ validate - Validate the model, usually in the course of training.
         This function simply calculates the validation loss and writes it
         to val_loss_array.
 
         Arguments:
+            my_device (torch.device) - The device to use in validation.
+            Either 'cuda' for GPU or 'cpu' otherwise, usually set as command
+            line argument.
             epoch (int) - The epoch in val_loss_array at which to write
             validation loss. If left at None, just print validation loss.
             predictions (bool) - If set to true, return the model output and labels
@@ -212,54 +221,61 @@ class ClassifierTrainer():
             predictions flag is set to true.
         """
 
-        # Put model in evaluation mode
-        self.model.eval()
+        # Set no_grad to prevent runaway memory usage
+        with torch.no_grad():
 
-        # Initialize loss counter and output arrays if necessary
-        val_loss = 0
+            # Put model in evaluation mode
+            self.model.eval()
 
-        if predictions:
-            output_array = np.zeros(self.val_total_events)
-            label_array = np.zeros(self.val_total_events)
-            # This is duplicating labels, but easier than getting them out of
-            # dataloader given we would need to undo one-hot encoding.
-            event_index = 0
+            # Initialize loss counter and output arrays if necessary
+            val_loss = 0
 
-        for i, data in enumerate(self.valid_data):
-
-            # Pull sample and labels from data array, and flatten sample
-            sample, label = data
-            sample = torch.flatten(sample, start_dim=1, end_dim=2)
-
-            # Evaluation forward pass
-            output = self.model(sample)
-
-            # Evaluate loss
-            loss = self.loss_function(output, label)
-            val_loss += loss
-
-            # Write output and labels to arrays if necessary. This is terrible
-            # code, clean this up if frequently used!
             if predictions:
-                signal_scores = output[:,1].detach().numpy()
-                signal_labels= label[:,1].detach().numpy()
-                event_end_index = event_index + len(signal_scores)
-                output_array[event_index:event_end_index] = signal_scores
-                label_array[event_index:event_end_index] = signal_labels
-                event_index = event_end_index
+                output_array = np.zeros(self.val_total_events)
+                label_array = np.zeros(self.val_total_events)
+                # This is duplicating labels, but easier than getting them out of
+                # dataloader given we would need to undo one-hot encoding.
+                event_index = 0
 
-        # Write validation loss to array, or print as desired
-        avg_val_loss = val_loss / self.val_batch_per_epoch
-        if epoch != None:
-            self.val_loss_array[epoch] = avg_val_loss
-        else:
-            print("Validation loss: ", float(avg_val_loss))
+            for i, data in enumerate(self.valid_data):
 
-        # Return output and label array if predictions is set to true
-        if predictions:
-            return (output_array, label_array)
+                # Pull sample and labels from data array, and flatten sample
+                sample, label = data
+                sample = torch.flatten(sample, start_dim=1, end_dim=2)
 
-    def analyze(self, filename=None):
+                # Set sample to correct device
+                sample = sample.to(device=my_device)
+                label = sample.to(device=my_device)
+
+                # Evaluation forward pass
+                output = self.model(sample)
+
+                # Evaluate loss
+                loss = self.loss_function(output, label)
+                val_loss += loss
+
+                # Write output and labels to arrays if necessary. This is terrible
+                # code, clean this up if frequently used!
+                if predictions:
+                    signal_scores = output[:,1].detach().numpy()
+                    signal_labels = label[:,1].detach().numpy()
+                    event_end_index = event_index + len(signal_scores)
+                    output_array[event_index:event_end_index] = signal_scores
+                    label_array[event_index:event_end_index] = signal_labels
+                    event_index = event_end_index
+
+            # Write validation loss to array, or print as desired
+            avg_val_loss = val_loss / self.val_batch_per_epoch
+            if epoch != None:
+                self.val_loss_array[epoch] = avg_val_loss
+            else:
+                print("Validation loss: ", float(avg_val_loss))
+
+            # Return output and label array if predictions is set to true
+            if predictions:
+                return (output_array, label_array)
+
+    def analyze(self, filename=None, **kwargs):
         """ analyze - This function will calculate the AUC of the model over
         the validation set, and generate a roc curve and a histogram of the
         network output.
@@ -268,6 +284,9 @@ class ClassifierTrainer():
             filename (string) - Filename at which to save plots. If none is
             given, simply display plots.
 
+            WARNING: my_device keyword argument will need to be set in order
+            to be passed to validate function! (fix this)
+
         Returns:
             None
         """
@@ -275,7 +294,7 @@ class ClassifierTrainer():
         print("\n\n######## ANALYZE MODEL ########")
 
         # First get model predictions for validation set using validate
-        output, labels = self.validate(predictions=True)
+        output, labels = self.validate(predictions=True, **kwargs)
 
         # Now calculate and print AUC
         auc_score = metrics.roc_auc_score(labels, output)
