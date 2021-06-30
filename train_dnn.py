@@ -16,17 +16,17 @@ from dnn.simple_dnn import simpleDNN
 
 
 # Start by setting some training parameters
-n_epochs = 30
+n_epochs = 100
 my_batch_size = 100
 max_constits = 80
-constit_branches = ['fjet_sortClusNormByPt_pt', 'fjet_sortClusCenterRotFlip_eta',
-                    'fjet_sortClusCenterRot_phi', 'fjet_sortClusNormByPt_e']
+constit_branches = ['fjet_sortClusStan_pt', 'fjet_sortClusCenterRotFlip_eta',
+                    'fjet_sortClusCenterRot_phi', 'fjet_sortClusStan_e']
 
 # Build datadumper and return pytorch dataloader object
 print("\nBuilding data objects...")
-dd_train = data_dumper.DataDumper("/data/homezvol0/kgreif/toptag/samples/unshuf_test.root", "train",
+dd_train = data_dumper.DataDumper("/data/homezvol0/kgreif/toptag/samples/sample_1M.root", "train",
                                    constit_branches, 'fjet_signal')
-dd_valid = data_dumper.DataDumper("/data/homezvol0/kgreif/toptag/samples/unshuf_test.root", "valid",
+dd_valid = data_dumper.DataDumper("/data/homezvol0/kgreif/toptag/samples/sample_1M.root", "valid",
                                    constit_branches, 'fjet_signal')
 train_dl = dd_train.torch_dataloader(max_constits=80, batch_size=my_batch_size, shuffle=True)
 valid_dl = dd_train.torch_dataloader(max_constits=80, batch_size=my_batch_size, shuffle=True)
@@ -51,14 +51,14 @@ model_trainer.load_data(train_dl, flag=1)
 model_trainer.load_data(valid_dl, flag=2)
 
 # Analyze the model before training
-model_trainer.analyze()
+model_trainer.analyze(filename="./plots/initial_output.png")
 
 # Train the model
-model_trainer.train(n_epochs, validate=True, checkpoints=None)
+min_loss_index = model_trainer.train(n_epochs, validate=True, checkpoints="./checkpoints")
 
 # Show some simple results
-print("\nFinal train loss: ", model_trainer.tr_loss_array[-1])
-print("Final valid loss: ", model_trainer.val_loss_array[-1])
+print("\nFinal train loss: ", model_trainer.tr_loss_array[min_loss_index])
+print("Final valid loss: ", model_trainer.val_loss_array[min_loss_index])
 
 # Plot loss and save figure
 plt.plot(model_trainer.tr_loss_array, label="Training")
@@ -70,5 +70,8 @@ plt.ylabel("BCE Loss")
 plt.savefig("./plots/loss.png", dpi=300)
 plt.clf()
 
+# Load in model with the best training loss
+model_trainer.load_model("./checkpoints/checkpt_e" + str(min_loss_index) + ".pt")
+
 # Finally analyze the model after training
-model_trainer.analyze()
+model_trainer.analyze(filename="./plots/final_output.png")

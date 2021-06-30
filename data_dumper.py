@@ -14,7 +14,7 @@ import awkward as ak
 import numpy as np
 
 # Use custom stylesheet for plotting
-plt.style.use('/home/kgreif/Documents/General Programming/mattyplotsalot/allpurpose.mplstyle')
+plt.style.use('~/mattyplotsalot/allpurpose.mplstyle')
 
 
 class DataDumper():

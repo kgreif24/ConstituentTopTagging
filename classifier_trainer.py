@@ -9,6 +9,8 @@ python3
 
 import torch
 import sklearn.metrics as metrics
+import matplotlib
+matplotlib.use('Agg')  # Disable X forwarding for use on HPC3
 import matplotlib.pyplot as plt
 import numpy as np
 import data_dumper
@@ -110,12 +112,15 @@ class ClassifierTrainer():
             at the end of every epoch
 
         Returns:
-            None
+            (int) - The index of the epoch at which minimum training loss
+            was achieved.
         """
 
         # Initialize arrays to keep track of loss
         self.tr_loss_array = np.zeros(n_epochs)
         self.val_loss_array = np.zeros(n_epochs)
+        min_loss  = 100000  # Initialize this to some stupid large number
+        min_loss_epoch = 0
 
         print("\n######## START TRAINING LOOP ########")
         # The training loop
@@ -149,7 +154,13 @@ class ClassifierTrainer():
                 self.optimizer.step()
 
             # Write training loss to array
-            self.tr_loss_array[epoch] = tr_loss / self.tr_batch_per_epoch
+            epoch_train_loss = tr_loss / self.tr_batch_per_epoch
+            self.tr_loss_array[epoch] = epoch_train_loss
+
+            # Check if this is new record training loss
+            if epoch_train_loss < min_loss:
+                min_loss = epoch_train_loss
+                min_loss_epoch = epoch
 
             # Now validate if necessary!
             if validate:
@@ -161,12 +172,29 @@ class ClassifierTrainer():
                 path  = checkpoints + filename
                 self.save_model(path)
 
-            # Lastly print losses
+            # Print losses
             print("--Training loss: ", str(self.tr_loss_array[epoch]))
             print("--Validation loss: ", str(self.val_loss_array[epoch]))
 
+            # Lastly we want to exit training loop if training loss has not decreased 
+            # in the last 5 epochs, (after first 6 epochs)
+            if epoch > 5:
+                if min_loss < np.min(self.tr_loss_array[epoch-5:epoch+1]):
+                    
+                    # Trim loss arrays so they don't have trailing zeros
+                    self.tr_loss_array = np.trim_zeros(self.tr_loss_array, trim='b')
+                    self.val_loss_array = np.trim_zeros(self.val_loss_array, trim='b')
+
+                    # And break from training loop
+                    print("\nNo decrease in training loss over last 5 epochs!")
+                    print("Exiting...")
+                    break
+
         # Print end of training loop
         print("\n######## END TRAINING LOOP ########")
+
+        # Return index
+        return min_loss_epoch
 
     def validate(self, epoch=None, predictions=False):
         """ validate - Validate the model, usually in the course of training.
@@ -267,4 +295,5 @@ class ClassifierTrainer():
             plt.savefig(filename, dpi=300)
             plt.clf()
         else:
-            plt.show()
+            # plt.show()
+            print("Sorry, no display :(")
