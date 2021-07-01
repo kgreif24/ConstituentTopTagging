@@ -4,10 +4,11 @@
 
 #SBATCH --job-name=trainDNN                       ## Name of the job.
 #SBATCH -A kgreif                                 ## account to charge 
-#SBATCH -p standard                               ## partition/queue name
+#SBATCH -p free                                   ## partition/queue name
 #SBATCH --nodes=1                                 ## (-N) number of nodes to use
 #SBATCH --ntasks=1                                ## (-n) number of tasks to launch
 #SBATCH --cpus-per-task=1                         ## number of cores the job needs
+#SBATCH --mem=6G                                  ## Request 6GB of memory
 #SBATCH --error=./dnn/training/trainDNN.err       ## error log file
 #SBATCH --output=./dnn/training/trainDNN.out      ## output file
 
@@ -23,7 +24,7 @@ module load pytorch/1.5.1
 homedir=$(pwd)
 
 # Now make directories to store training info/plots if they don't exist yet
-trdir="${homedir}/dnn/training/test"
+trdir="${homedir}/dnn/training/test_weights/"
 mkdir -p ${trdir}/plots
 mkdir -p ${trdir}/checkpoints
 

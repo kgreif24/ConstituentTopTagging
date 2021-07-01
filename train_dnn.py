@@ -49,23 +49,30 @@ constit_branches = ['fjet_sortClusStan_pt', 'fjet_sortClusCenterRotFlip_eta',
 # Build datadumper and return pytorch dataloader object
 print("\nBuilding data objects...")
 dd_train = data_dumper.DataDumper("/data/homezvol0/kgreif/toptag/samples/sample_1M.root", "train",
-                                   constit_branches, 'fjet_signal')
+                                   constit_branches, 'fjet_signal', 'fjet_match_weight_pt')
 dd_valid = data_dumper.DataDumper("/data/homezvol0/kgreif/toptag/samples/sample_1M.root", "valid",
-                                   constit_branches, 'fjet_signal')
+                                   constit_branches, 'fjet_signal', 'fjet_match_weight_pt')
 train_dl = dd_train.torch_dataloader(max_constits=my_max_constits, batch_size=my_batch_size, shuffle=True)
-valid_dl = dd_train.torch_dataloader(max_constits=my_max_constits, batch_size=my_batch_size, shuffle=True)
+valid_dl = dd_valid.torch_dataloader(max_constits=my_max_constits, batch_size=my_batch_size, shuffle=True)
+print("Training events: ", dd_train.num_events)
+print("Validation events: ", dd_valid.num_events)
 
 # Find shape of each mini batch
 sample_shape = tuple([my_batch_size]) + dd_train.sample_shape()
 input_shape = sample_shape[1] * sample_shape[2]
 
+# Delete data dumpers to save on memory!
+del dd_train
+del dd_valid
+
 # Now build the model!
 print("\nBuilding model...")
 model = simpleDNN(input_shape).to(device=args.device)
+print(model)
 
 # Build optimizer and loss function
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-loss_func = torch.nn.BCELoss()
+loss_func = torch.nn.BCELoss(reduction='none')  # to apply event weights set reduction to none
 
 # Now build ClassifierTrainer for this model
 model_trainer = classifier_trainer.ClassifierTrainer(model, optimizer, loss_func)

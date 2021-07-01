@@ -138,12 +138,13 @@ class ClassifierTrainer():
             for i, data in enumerate(self.train_data):
 
                 # Pull sample and labels from data array, and flatten sample
-                sample, label = data
+                sample, label, weights = data
                 sample = torch.flatten(sample, start_dim=1, end_dim=2)
 
                 # Send sample to correct device
                 sample = sample.to(device=my_device)
-                label = sample.to(device=my_device)
+                label = label.to(device=my_device)
+                weights = weights.to(device=my_device)
 
                 # Zero gradients
                 self.optimizer.zero_grad()
@@ -152,12 +153,20 @@ class ClassifierTrainer():
                 output = self.model(sample)
 
                 # Evaluate loss
-                loss = self.loss_function(output, label)
-                tr_loss += loss
+                loss_vec = self.loss_function(output, label)
+
+                # Since loss vec has 2 identical columns, can just take the first one
+                loss_vec = loss_vec[:,0]
+
+                # Multiply loss vector by weights and take mean to get batch loss
+                loss = torch.mean(torch.mul(weights, loss_vec))
 
                 # Backprop and optimizer step
                 loss.backward()
                 self.optimizer.step()
+
+                # Add loss value to tr_loss
+                tr_loss += loss.detach()
 
             # Write training loss to array
             epoch_train_loss = tr_loss / self.tr_batch_per_epoch
@@ -170,7 +179,7 @@ class ClassifierTrainer():
 
             # Now validate if necessary!
             if validate:
-                self.validate(epoch)
+                self.validate(my_device=my_device, epoch=epoch) # ugly syntax!
 
             # And save model if desired
             if checkpoints != None:
@@ -240,25 +249,31 @@ class ClassifierTrainer():
             for i, data in enumerate(self.valid_data):
 
                 # Pull sample and labels from data array, and flatten sample
-                sample, label = data
+                sample, label, weights = data
                 sample = torch.flatten(sample, start_dim=1, end_dim=2)
 
                 # Set sample to correct device
                 sample = sample.to(device=my_device)
-                label = sample.to(device=my_device)
+                label = label.to(device=my_device)
+                weights = weights.to(device=my_device)
 
                 # Evaluation forward pass
                 output = self.model(sample)
 
                 # Evaluate loss
-                loss = self.loss_function(output, label)
-                val_loss += loss
+                loss_vec = self.loss_function(output, label)
+
+                # Since loss vec has 2 identical columns, can just take the first one
+                loss_vec = loss_vec[:,0]
+
+                # Multiply loss vec by weights, take mean, and add to val loss
+                val_loss += torch.mean(torch.mul(weights, loss_vec)).detach()
 
                 # Write output and labels to arrays if necessary. This is terrible
                 # code, clean this up if frequently used!
                 if predictions:
-                    signal_scores = output[:,1].detach().numpy()
-                    signal_labels = label[:,1].detach().numpy()
+                    signal_scores = output[:,1].cpu().detach().numpy()
+                    signal_labels = label[:,1].cpu().detach().numpy()
                     event_end_index = event_index + len(signal_scores)
                     output_array[event_index:event_end_index] = signal_scores
                     label_array[event_index:event_end_index] = signal_labels

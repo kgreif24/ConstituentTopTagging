@@ -22,7 +22,7 @@ class DataDumper():
     several methods which dump data into desired format.
     """
 
-    def __init__(self, root_path, tree_name, branches, signal_name):
+    def __init__(self, root_path, tree_name, branches, signal_name, weight_name):
         """ __init__ - Init function for this class. Will produce awkward
         arrays of selected branches, stored in a python list
 
@@ -32,6 +32,7 @@ class DataDumper():
             branches (list): List of strings of the names of branches we wish
             to extract
             signal_name (string): Name of signal branch in tree
+            weight_name (string): Name of weights branch in tree
 
         Returns:
             None
@@ -56,6 +57,7 @@ class DataDumper():
 
         # Finally extract labels from tree. Natively store these as numpy
         self.labels = ak.to_numpy(tree[signal_name].array())
+        self.weights = ak.to_numpy(tree[weight_name].array())
 
     def plot_branches(self, branches, log=True, directory=None):
         """ plot_branches - This function takes in a list of strings that are
@@ -141,9 +143,10 @@ class DataDumper():
         # Now make torch tensors
         data_torch = torch.from_numpy(data)
         label_torch = torch.from_numpy(cat_labels)
+        weights_torch = torch.from_numpy(self.weights)
 
         # And return DataLoader
-        dataset = torch.utils.data.TensorDataset(data_torch, label_torch)
+        dataset = torch.utils.data.TensorDataset(data_torch, label_torch, weights_torch)
         return torch.utils.data.DataLoader(dataset, **kwargs)
 
     def sample_shape(self):

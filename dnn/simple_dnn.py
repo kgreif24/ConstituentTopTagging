@@ -32,14 +32,15 @@ class simpleDNN(torch.nn.Module):
         # Set input shape to member instance
         self.input_shape = input_shape
 
-        # Start with just a linear classifier. It will suck, but worth getting
-        # a baseline
+        # Define network
         self.stack = torch.nn.Sequential(
             torch.nn.Linear(self.input_shape, 100),
+            torch.nn.BatchNorm1d(num_features=100),
             torch.nn.ReLU(),
-            torch.nn.Linear(100, 50),
+            torch.nn.Linear(100, 100),
+            torch.nn.BatchNorm1d(num_features=100),
             torch.nn.ReLU(),
-            torch.nn.Linear(50, 2),
+            torch.nn.Linear(100, 2),
             torch.nn.Softmax(dim=1)
         )
 
