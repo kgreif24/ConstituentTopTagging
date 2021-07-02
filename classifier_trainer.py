@@ -311,9 +311,11 @@ class ClassifierTrainer():
         # First get model predictions for validation set using validate
         output, labels = self.validate(predictions=True, **kwargs)
 
-        # Now calculate and print AUC
-        auc_score = metrics.roc_auc_score(labels, output)
-        print("AUC score over validation set: ", auc_score)
+        # Now calculate roc curve using sklearn roc_curve
+        fpr, tpr, thresholds = metrics.roc_curve(labels, output)
+
+        # Go ahead and calculate AUC as well
+        auc_score = metrics.roc_auc_score(labels, ouput)
 
         # Make a histogram of the model output
         output_sig = output[labels == 1]
@@ -329,5 +331,9 @@ class ClassifierTrainer():
             plt.savefig(filename, dpi=300)
             plt.clf()
         else:
-            # plt.show()
-            print("Sorry, no display :(")
+            print("Sorry, no display to show output histogram :(")
+
+        # Build python dictionary with info and return
+        dict = {'fpr': fpr, 'tpr': tpr, 'thresholds': thresholds,
+                'auc': auc_score}
+        return dict

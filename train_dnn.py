@@ -109,4 +109,11 @@ filestr = args.checkDir + "/checkpt_e" + str(min_loss_index) + ".pt"
 model_trainer.load_model(filestr)
 
 # Finally analyze the model after training
-model_trainer.analyze(filename="./plots/final_output.png", my_device=args.device)
+analyze_dict = model_trainer.analyze(filename="./plots/final_output.png",
+                                     my_device=args.device)
+
+# Calculate background rejection at FPR = 0.5, 0.8 working points
+
+
+# Print out metrics
+print("AUC score: ", analyze_dict['auc'])
