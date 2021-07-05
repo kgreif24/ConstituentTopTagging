@@ -1,16 +1,18 @@
 #!/bin/bash
 
 # This is a script for submitting DNN training jobs on the HPC3 cluster.
+# Meant for testing jobs in an interactive setting, without GPU
+# acceleration.
 
-#SBATCH --job-name=trainDNN                       ## Name of the job.
+#SBATCH --job-name=test                           ## Name of the job.
 #SBATCH -A kgreif                                 ## account to charge 
 #SBATCH -p free                                   ## partition/queue name
 #SBATCH --nodes=1                                 ## (-N) number of nodes to use
 #SBATCH --ntasks=1                                ## (-n) number of tasks to launch
 #SBATCH --cpus-per-task=1                         ## number of cores the job needs
 #SBATCH --mem=6G                                  ## Request 6GB of memory
-#SBATCH --error=./dnn/training/trainDNN.err       ## error log file
-#SBATCH --output=./dnn/training/trainDNN.out      ## output file
+#SBATCH --error=./outfiles/test.err       ## error log file
+#SBATCH --output=./outfiles/test.out      ## output file
 
 # Start by printing out hostname and date of job
 echo "Found a node, here's some info: "
@@ -24,7 +26,7 @@ module load pytorch/1.5.1
 homedir=$(pwd)
 
 # Now make directories to store training info/plots if they don't exist yet
-trdir="${homedir}/dnn/training/test_weights/"
+trdir="${homedir}/dnn/training/test/"
 mkdir -p ${trdir}/plots
 mkdir -p ${trdir}/checkpoints
 
