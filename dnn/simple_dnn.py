@@ -14,13 +14,15 @@ class simpleDNN(torch.nn.Module):
     trained on the top tagging dataset.
     """
 
-    def __init__(self, input_shape):
+    def __init__(self, input_shape, int_nodes=100):
         """ __init__ - The initialization function for our neural network.
         Function will initialize weights and biases and create layers.
 
         Arguments:
             input_shape (tuple): a tuple which gives dimensions of input
             dataset (events, constituents)
+            int_nodes (int): The number of nodes to include in the 3
+            hidden layers.
 
         Returns:
             None
@@ -34,13 +36,13 @@ class simpleDNN(torch.nn.Module):
 
         # Define network
         self.stack = torch.nn.Sequential(
-            torch.nn.Linear(self.input_shape, 100),
-            torch.nn.BatchNorm1d(num_features=100),
+            torch.nn.Linear(self.input_shape, int_nodes),
+            torch.nn.BatchNorm1d(num_features=int_nodes),
             torch.nn.ReLU(),
-            torch.nn.Linear(100, 100),
-            torch.nn.BatchNorm1d(num_features=100),
+            torch.nn.Linear(int_nodes, int_nodes),
+            torch.nn.BatchNorm1d(num_features=int_nodes),
             torch.nn.ReLU(),
-            torch.nn.Linear(100, 2),
+            torch.nn.Linear(int_nodes, 2),
             torch.nn.Softmax(dim=1)
         )
 

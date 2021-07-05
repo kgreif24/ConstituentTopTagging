@@ -8,12 +8,15 @@ Author: Kevin Greif
 python3
 """
 
+import torch
 import sklearn
 import numpy as np
 import matplotlib.pyplot as plt
+plt.style.use('~/mattyplotsalot/allpurpose.mplstyle')
 import argparse
 import data_dumper
 import classifier_trainer
+from dnn.simple_dnn import simpleDNN
 
 
 # Start by parsing command line arguments
@@ -79,3 +82,7 @@ print("AUC score: ", analyze_dict['auc'])
 
 # Make an inverse roc plot. Take 1/fpr and plot this against tpr
 plt.plot(tpr, fprinv)
+plt.yscale('log')
+plt.ylabel('Background rejection')
+plt.xlabel('Signal efficiency')
+plt.show()

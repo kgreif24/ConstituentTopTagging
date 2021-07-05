@@ -7,7 +7,11 @@ Author: Kevin Greif
 python3
 """
 
+import os
+
 import torch
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 import argparse
@@ -27,6 +31,8 @@ parser.add_argument('-b', '--batchSize', default=100, type=int,
                     help='Batch size')
 parser.add_argument('--maxConstits', default=80, type=int,
                     help='Number of constituents to include per event')
+parser.add_argument('--nodes', default=100, type=int,
+                    help='Number of nodes to includes in the 3 hidden layers')
 parser.add_argument('-o', '--checkDir', default='./checkpoints', type=str,
                     help='Stem of file name at which to save checkpoints')
 args = parser.parse_args()
@@ -67,7 +73,7 @@ del dd_valid
 
 # Now build the model!
 print("\nBuilding model...")
-model = simpleDNN(input_shape).to(device=args.device)
+model = simpleDNN(input_shape, int_nodes=args.nodes).to(device=args.device)
 print(model)
 
 # Build optimizer and loss function
@@ -90,6 +96,12 @@ min_loss_index = model_trainer.train(n_epochs,
                                      validate=True,
                                      checkpoints=args.checkDir)
 
+# Rename min loss checkpoint file so we know its the best one
+oldfile = args.checkDir + "/checkpt_e" + str(min_loss_index) + ".pt"
+newfile = args.checkDir + "/checkpt_best.pt"
+command = "mv " + oldfile + " " + newfile 
+os.system(command)
+
 # Show some simple results
 print("\nFinal train loss: ", model_trainer.tr_loss_array[min_loss_index])
 print("Final valid loss: ", model_trainer.val_loss_array[min_loss_index])
@@ -105,15 +117,21 @@ plt.savefig("./plots/loss.png", dpi=300)
 plt.clf()
 
 # Load in model with the best training loss
-filestr = args.checkDir + "/checkpt_e" + str(min_loss_index) + ".pt"
-model_trainer.load_model(filestr)
+model_trainer.load_model(newfile)
 
 # Finally analyze the model after training
 analyze_dict = model_trainer.analyze(filename="./plots/final_output.png",
                                      my_device=args.device)
 
-# Calculate background rejection at FPR = 0.5, 0.8 working points
+# Extract fpr, tpr
+fpr = analyze_dict['fpr']
+tpr = analyze_dict['tpr']
+fprinv = 1 / fpr
 
+# Find background rejection at tpr = 0.5, 0.8 working points
+wp_p5 = np.argmax(tpr > 0.5)
+wp_p8 = np.argmax(tpr > 0.8)
 
-# Print out metrics
+print("Background rejection at 0.5 signal efficiency: ", fprinv[wp_p5])
+print("Background rejection at 0.8 signal efficiency: ", fprinv[wp_p8])
 print("AUC score: ", analyze_dict['auc'])

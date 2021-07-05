@@ -34,7 +34,7 @@ echo "In directory ${trdir}"
 ls -lrth
 
 # Next build command to run python training script
-command="python ${homedir}/train_dnn.py"
+command="python ${homedir}/train_dnn.py --nodes 100 -N 5"
 
 # Run command
 echo "================================"

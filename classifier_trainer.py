@@ -9,11 +9,10 @@ python3
 
 import torch
 import sklearn.metrics as metrics
-import matplotlib
-matplotlib.use('Agg')  # Disable X forwarding for use on HPC3
 import matplotlib.pyplot as plt
 import numpy as np
 import data_dumper
+import time
 
 
 class ClassifierTrainer():
@@ -99,7 +98,7 @@ class ClassifierTrainer():
         Returns:
             None
         """
-        self.model.load_state_dict(torch.load(filePath))
+        self.model.load_state_dict(torch.load(filePath, map_location=torch.device('cpu')))
 
     def train(self, n_epochs, my_device=None, validate=True, checkpoints=None):
         """ train - Actually train the network for the given number of epochs.
@@ -117,6 +116,9 @@ class ClassifierTrainer():
             (int) - The index of the epoch at which minimum training loss
             was achieved.
         """
+
+        # Start clock
+        tr_start = time.time()
 
         # Initialize arrays to keep track of loss
         self.tr_loss_array = np.zeros(n_epochs)
@@ -202,10 +204,12 @@ class ClassifierTrainer():
 
                     # And break from training loop
                     print("\nNo decrease in training loss over last 5 epochs!")
+                    print("Smallest validation loss epoch was ", min_loss_epoch)
                     print("Exiting...")
                     break
 
         # Print end of training loop
+        print("Model training time: ", time.time() - tr_start)
         print("\n######## END TRAINING LOOP ########")
 
         # Return index
@@ -315,7 +319,7 @@ class ClassifierTrainer():
         fpr, tpr, thresholds = metrics.roc_curve(labels, output)
 
         # Go ahead and calculate AUC as well
-        auc_score = metrics.roc_auc_score(labels, ouput)
+        auc_score = metrics.roc_auc_score(labels, output)
 
         # Make a histogram of the model output
         output_sig = output[labels == 1]
@@ -332,6 +336,7 @@ class ClassifierTrainer():
             plt.clf()
         else:
             print("Sorry, no display to show output histogram :(")
+            plt.clf()
 
         # Build python dictionary with info and return
         dict = {'fpr': fpr, 'tpr': tpr, 'thresholds': thresholds,
