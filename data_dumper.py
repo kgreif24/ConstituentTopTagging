@@ -22,7 +22,8 @@ class DataDumper():
     several methods which dump data into desired format.
     """
 
-    def __init__(self, root_path, tree_name, input_branch, signal_name, extras=None):
+    def __init__(self, root_path, tree_name, input_branch,
+                 signal_name, extras=None, max_constits=80):
         """ __init__ - Init function for this class. Will produce awkward
         arrays of selected branches, stored in a python list
 
@@ -35,6 +36,9 @@ class DataDumper():
             extras (list): List of strings of the names of branches that will
             be extras, packaged into data loader but not fed directly to model.
             Examples are event weights, jetPt, etc.
+            max_constits (int): The maximum number of constituents to keep
+            in a single jet. Jets with less than this will be padded, jets
+            with more will be padded.
 
         Returns:
             None
@@ -46,9 +50,11 @@ class DataDumper():
         # Separate out train/valid trees.
         tree = input_file[tree_name]
 
-        # Initialize dict of ak arrays for inputs and extras
+        # Initialize dict of ak arrays for inputs and extras, as well as
+        # max constits instance variable
         self.input_dict = {}
         self.extra_dict = {}
+        self.max_constits = max_constits
 
         # Loop over branches list and push awkward array into input_dict
         for branch_name in input_branch:
@@ -63,12 +69,10 @@ class DataDumper():
         self.num_events = len(self.labels)
 
         # Finally deal with the extras. Loop over extras list and push arrays
-        # into extra_dict. Can natively store these as numpy, since we assume
-        # they are event level features
+        # into extra_dict.
         if extras != None:
             for branch_name in extras:
-                np_extra = ak.to_numpy(tree[branch_name].array())
-                self.extra_dict[branch_name] = np_extra
+                self.extra_dict[branch_name] = tree[branch_name].array()
 
     def plot_branches(self, branches, log=True, directory=None):
         """ plot_branches - This function takes in a list of strings that are
@@ -124,16 +128,16 @@ class DataDumper():
             else:
                 plt.show()
 
-    def torch_dataloader(self, max_constits=80, **kwargs):
-        """ torch_dataloader - Packages data and labels into a torch data-
-        loader which can be used for training a model. Takes in maximum
-        number of constituents to be passed in each jet.
+    def np_arrays(self, **kwargs):
+        """ np_arrays - Packages data, labels, and extras in numpy arrays,
+        and returns arrays as a list of that can then be sent into keras api.
+        Takes in maximum number of constituents to be considered in each jet.
 
         Arguments:
-            max_constits (int): Number of constituents to be passed
+            None
 
         Returns:
-            (torch.utils.data.DataLoader)
+            (list): List of np arrays
         """
 
         # First send all of the labels to a 1 hot encoded
@@ -144,11 +148,10 @@ class DataDumper():
         # with 0's, and trucate jets with more than the maximum.
         # Assume only input features will be of variable length, need to be
         # padded.
-        self.max_constits = max_constits
-        # Loop through input_dict
+        # Also alter the input_dict in place to cut down on memory consumption
         for key, data_feature in self.input_dict.items():
             # Pad with None values, and then replace None with 0's
-            df_none = ak.pad_none(data_feature, max_constits, axis=1, clip=True)
+            df_none = ak.pad_none(data_feature, self.max_constits, axis=1, clip=True)
             df_zero = ak.fill_none(df_none, 0)
             # Set ak_dict entry to df_zero
             self.input_dict[key] = df_zero
@@ -159,19 +162,35 @@ class DataDumper():
         # Call numpy.stack
         data = np.dstack(tuple(np_dict.values()))
 
-        # Now make torch tensors from the data and labels
-        data_torch = torch.from_numpy(data)
-        label_torch = torch.from_numpy(cat_labels)
+        # Lastly turn the extras into numpy arrays
+        extras = {key: ak.to_numpy(df).astype('float32') for key, df in self.extra_dict.items()}
 
-        # Next make torch tensors from the arrays in extra_dict
-        # Want to pass these to tensor dataset constructer contained in list
-        # that we can unpack.
-        extra_tensors = []
-        for key, data_feature in self.extra_dict.items():
-            extra_tensors.append(torch.from_numpy(data_feature))
+        # Now package everything into a list and return
+        data_list = [data, cat_labels] + list(extras.values())
+        return data_list
 
-        # And return DataLoader
-        dataset = torch.utils.data.TensorDataset(data_torch, label_torch, *extra_tensors)
+    def torch_dataloader(self, **kwargs):
+        """ torch_dataloader - Packages data and labels into a torch data-
+        loader which can be used for training a model. Takes in maximum
+        number of constituents to be passed in each jet.
+
+        Arguments:
+            None, but keyword arguments batch_size and shuffle should
+            be set here!
+
+        Returns:
+            (torch.utils.data.DataLoader)
+        """
+
+        # First call np_arrays to turn all of the data stored as awkward
+        # arrays into np arrays
+        np_data_list = self.np_arrays()
+
+        # Now send everything in np_data_list to a torch tensor
+        tensor_list = [torch.from_numpy(arr) for arr in np_data_list]
+
+        # Finally form dataset and return data loader
+        dataset = torch.utils.data.TensorDataset(*tensor_list)
         return torch.utils.data.DataLoader(dataset, **kwargs)
 
     def sample_shape(self):
@@ -195,7 +214,11 @@ if __name__ == '__main__':
 
     my_dump.plot_branches(my_extras)
 
-    torch_dl = my_dump.torch_dataloader(max_constits=80, batch_size=100, shuffle=True)
+    numpy_arr = my_dump.np_arrays()
+    for arr in numpy_arr:
+        print(np.shape(arr))
+
+    torch_dl = my_dump.torch_dataloader(batch_size=100, shuffle=True)
     print(len(torch_dl))
     print(my_dump.sample_shape())
     print(my_dump.num_events)
