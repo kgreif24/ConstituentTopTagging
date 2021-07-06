@@ -15,7 +15,7 @@ from energyflow.archs import EFN
 import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
-plt.style.use('~/Documents/General Programming/mattyplotsalot/allpurpose.mplstyle')
+plt.style.use('~/mattyplotsalot/allpurpose.mplstyle')
 
 from data_dumper import DataDumper
 
@@ -26,13 +26,13 @@ from data_dumper import DataDumper
 Phi_sizes, F_sizes = (100, 100, 128), (100, 100, 100)
 
 # Training parameters
-num_epoch = 5
+num_epoch = 1
 batch_size = 500
 checkpoint_filepath = "./training/test"
 
 # Data parameters
-# filepath = "/data/homezvol0/kgreif/toptag/samples/sample_1M.root"
-filepath = "../../Data/sample_1M.root"
+filepath = "/data/homezvol0/kgreif/toptag/samples/sample_1M.root"
+# filepath = "../../Data/sample_1M.root"
 constit_branches = ['fjet_sortClusStan_pt', 'fjet_sortClusCenterRotFlip_eta',
                     'fjet_sortClusCenterRot_phi', 'fjet_sortClusStan_e']
 extra_branches = ['fjet_match_weight_pt', 'fjet_pt']
@@ -77,7 +77,7 @@ efn = ef.archs.EFN(
     input_dim=2,
     Phi_sizes=Phi_sizes,
     F_sizes=F_sizes,
-    compile_opts={'loss_weights': weight_train},
+    compile_opts={},
     filepath=checkpoint_filepath,
     patience=5)
 
@@ -101,10 +101,11 @@ plt.show()
 ############################### Train EFN #################################
 
 # Train model by calling fit
-train_hist = efn.fit([z_train, p_train], train_arrs[1],
+train_hist = efn.fit([z_train, p_train], labels_train,
     epochs=num_epoch,
     batch_size=batch_size,
-    validation_data=([z_valid, p_valid], valid_arrs[1]),
+    sample_weight=weight_train,
+    validation_data=([z_valid, p_valid], labels_valid),
     verbose=1)
 
 ############################# Evaluate EFN #################################

@@ -7,7 +7,6 @@ Last updated 6/21/21
 python3
 """
 
-import torch
 import matplotlib.pyplot as plt
 import uproot
 import awkward as ak
@@ -181,6 +180,9 @@ class DataDumper():
         Returns:
             (torch.utils.data.DataLoader)
         """
+
+        # Import pytorch
+        import torch
 
         # First call np_arrays to turn all of the data stored as awkward
         # arrays into np arrays
