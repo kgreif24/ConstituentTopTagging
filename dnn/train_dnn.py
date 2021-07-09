@@ -7,7 +7,8 @@ Author: Kevin Greif
 python3
 """
 
-import os
+import sys, os
+sys.path.append('/data/homezvol0/kgreif/toptag/ML-TopTagging')  # Need classes stored in home dir
 
 import torch
 import matplotlib
@@ -33,7 +34,7 @@ parser.add_argument('--maxConstits', default=80, type=int,
                     help='Number of constituents to include per event')
 parser.add_argument('--nodes', default=100, type=int,
                     help='Number of nodes to includes in the 3 hidden layers')
-parser.add_argument('-o', '--checkDir', default='./checkpoints', type=str,
+parser.add_argument('-o', '--checkDir', default=None, type=str,
                     help='Stem of file name at which to save checkpoints')
 args = parser.parse_args()
 
@@ -51,15 +52,16 @@ my_batch_size = args.batchSize
 my_max_constits = args.maxConstits
 constit_branches = ['fjet_sortClusStan_pt', 'fjet_sortClusCenterRotFlip_eta',
                     'fjet_sortClusCenterRot_phi', 'fjet_sortClusStan_e']
+extra_branches = ['fjet_match_weight_pt']
 
 # Build datadumper and return pytorch dataloader object
 print("\nBuilding data objects...")
 dd_train = data_dumper.DataDumper("/data/homezvol0/kgreif/toptag/samples/sample_1M.root", "train",
-                                   constit_branches, 'fjet_signal', 'fjet_match_weight_pt')
+                                   constit_branches, 'fjet_signal', extras=extra_branches)
 dd_valid = data_dumper.DataDumper("/data/homezvol0/kgreif/toptag/samples/sample_1M.root", "valid",
-                                   constit_branches, 'fjet_signal', 'fjet_match_weight_pt')
-train_dl = dd_train.torch_dataloader(max_constits=my_max_constits, batch_size=my_batch_size, shuffle=True)
-valid_dl = dd_valid.torch_dataloader(max_constits=my_max_constits, batch_size=my_batch_size, shuffle=True)
+                                   constit_branches, 'fjet_signal', extras=extra_branches)
+train_dl = dd_train.torch_dataloader(batch_size=my_batch_size, shuffle=True)
+valid_dl = dd_valid.torch_dataloader(batch_size=my_batch_size, shuffle=True)
 print("Training events: ", dd_train.num_events)
 print("Validation events: ", dd_valid.num_events)
 
@@ -74,7 +76,9 @@ del dd_valid
 # Now build the model!
 print("\nBuilding model...")
 model = simpleDNN(input_shape, int_nodes=args.nodes).to(device=args.device)
+num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 print(model)
+print("Number of trainable parameters: ", num_params)
 
 # Build optimizer and loss function
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
@@ -93,7 +97,6 @@ model_trainer.analyze(filename="./plots/initial_output.png", my_device=args.devi
 # Train the model
 min_loss_index = model_trainer.train(n_epochs,
                                      my_device=args.device,
-                                     validate=True,
                                      checkpoints=args.checkDir)
 
 # Rename min loss checkpoint file so we know its the best one
