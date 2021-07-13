@@ -309,6 +309,7 @@ class DataBuilder(src.myutils.walker.Walker):
     rdf_sig = rdf_sig.Define(__sig_tag__, "1") \
                      .Filter(filter_basic_sig, filter_basic_sig) \
                      .Filter(filter_train, filter_train)
+
     # - Background
     rdf_bkg = rdf_bkg.Define(__sig_tag__, "0") \
                      .Filter(filter_basic_bkg, filter_basic_bkg) \
@@ -556,7 +557,7 @@ class DataBuilder(src.myutils.walker.Walker):
     with src.myutils.profile.Profile("Shuffle"):
       self._shuffle()
 
-    # Compute weights to get flat pt
+    # Preprocess constituent data and add preprocessed columns
     with src.myutils.profile.Profile("Preprocess data, add columns"):
       self._preprocess()
 

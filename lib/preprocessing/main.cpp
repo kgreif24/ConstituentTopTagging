@@ -80,14 +80,11 @@ auto flip = [](const ROOT::RVec<float> & x, const int & par)
   return par * x;
 };
 
-auto standardize = [](const ROOT::RVec<float> & x)
+auto norm = [](const ROOT::RVec<float> & x, ROOT::RVec<float> & w)
 {
-  float x_mean = ROOT::VecOps::Mean(x);
-  float x_stddev = ROOT::VecOps::StdDev(x);
   ROOT::RVec<float> x_norm(x);
-  return (x_norm - x_mean) / x_stddev;
+  return x_norm / ROOT::VecOps::Sum(w);
 };
-
 
 auto pca_angle = [](const ROOT::RVec<float> & eta, const ROOT::RVec<float> & phi, const ROOT::RVec<float> & e)
 {
@@ -208,8 +205,8 @@ int main (int argc, char **argv)
     // Flip jet based on parity
     .Define("fjet_sortClusCenterRotFlip_eta", flip, {"_fjet_sortClusCenterRot_eta", "fjet_parity"})
     // Normalize scaler components by scaler pT sum
-    .Define("fjet_sortClusStan_pt", standardize, {"fjet_sortClus_pt"})
-    .Define("fjet_sortClusStan_e",  standardize, {"fjet_sortClus_e"});
+    .Define("fjet_sortClusNormByPt_pt", norm, {"fjet_sortClus_pt", "fjet_sortClus_pt"})
+    .Define("fjet_sortClusNormByPt_e",  norm, {"fjet_sortClus_e", "fjet_sortClus_pt"});
 
   // Check if name of input and output file are identical
   if (fin == fout)
