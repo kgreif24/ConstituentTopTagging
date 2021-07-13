@@ -10,11 +10,10 @@
 #SBATCH -p free-gpu                               ## partition/queue name
 #SBATCH --gres=gpu:V100:1                         ## Use only 1 GPU
 #SBATCH --nodes=1                                 ## (-N) number of nodes to use
-#SBATCH --ntasks=1                                ## (-n) number of tasks to launch
-#SBATCH --cpus-per-task=1                         ## number of cores the job needs
-#SBATCH --mem=6G                                  ## Request 6GB of memory
+#SBATCH --mem=26G                                 ## Request 26G of memory to fit larger data
+#SBATCH --ntasks-per-node=9                       ## 26G // 3G gives you 9 tasks to launch on the node.
 
-#SBATCH --array=1-5
+#SBATCH --array=1-1
 
 #SBATCH --error=./outfiles/trainEFN1Ms_%j.err       ## error log file
 #SBATCH --output=./outfiles/trainEFN1Ms_%j.out      ## output file

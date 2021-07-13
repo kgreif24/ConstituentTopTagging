@@ -60,21 +60,23 @@ batch_size = args.batchSize
 checkpoint_filepath = args.checkDir
 
 # Data parameters
-filepath = "/data/homezvol0/kgreif/toptag/samples/sample_1M.root"
-# filepath = "../../Data/sample_1M.root"
-constit_branches = ['fjet_sortClusStan_pt', 'fjet_sortClusCenterRotFlip_eta',
-                    'fjet_sortClusCenterRot_phi', 'fjet_sortClusStan_e']
+filepath = "/data/homezvol0/kgreif/toptag/samples/sample_nr1M.root"
+constit_branches = ['fjet_sortClusNormByPt_pt', 'fjet_sortClusCenterRotFlip_eta',
+                    'fjet_sortClusCenterRot_phi', 'fjet_sortClusNormByPt_e']
 extra_branches = ['fjet_match_weight_pt', 'fjet_pt']
 my_max_constits = args.maxConstits
 
 ############################# Process Data ################################
 
-# Now build dds and make numpy arrays
+# Now build dds and use them to plot all branches of interest
 print("Building data objects...")
 dd_train = DataDumper(filepath, "train", constit_branches, "fjet_signal",
                       extras=extra_branches, max_constits=my_max_constits)
 dd_valid = DataDumper(filepath, "valid", constit_branches, "fjet_signal",
                       extras=extra_branches, max_constits=my_max_constits)
+dd_train.plot_branches(constit_branches + extra_branches, directory="./plots/")
+
+# Now make np arrays out of the data
 train_arrs = dd_train.np_arrays()
 valid_arrs = dd_valid.np_arrays()
 
@@ -95,12 +97,20 @@ raw_labels_valid = labels_valid[:,1]
 weight_train = train_arrs[2]
 weight_valid = valid_arrs[2]
 
+# Delete arrays to save memory
+del train_arrs
+del valid_arrs
+
 print("Shapes of input arrays and label array: ")
 print(np.shape(z_train))
 print(np.shape(p_train))
 print(np.shape(labels_train))
 
-# Further memory optimization possible here!
+# Verify that there are no NaNs in data, labels, or weights
+assert not np.any(np.isnan(z_train))
+assert not np.any(np.isnan(p_train))
+assert not np.any(np.isnan(labels_train))
+assert not np.any(np.isnan(weight_train))
 
 ############################# Build EFN ##################################
 
@@ -139,7 +149,7 @@ train_hist = efn.fit([z_train, p_train], labels_train,
                      batch_size=batch_size,
                      sample_weight=weight_train,
                      validation_data=([z_valid, p_valid], labels_valid, weight_valid),
-                     verbose=2)
+                     verbose=1)
 
 # Plot losses
 plt.clf()
@@ -172,8 +182,8 @@ plt.title("EFN output over validation set")
 plt.savefig("./plots/final_output.png", dpi=300)
 
 # Get ROC curve and AUC
-fpr, tpr, thresholds = metrics.roc_curve(valid_arrs[1][:,1], preds[:,1])
-auc = metrics.roc_auc_score(valid_arrs[1][:,1], preds[:,1])
+fpr, tpr, thresholds = metrics.roc_curve(raw_labels_valid, preds[:,1])
+auc = metrics.roc_auc_score(raw_labels_valid, preds[:,1])
 fprinv = 1 / fpr
 
 # Find background rejection at tpr = 0.5, 0.8 working points

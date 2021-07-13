@@ -161,7 +161,10 @@ class DataDumper():
         # Call numpy.stack
         data = np.dstack(tuple(np_dict.values()))
 
-        # Lastly turn the extras into numpy arrays
+        # Preprocessing can introduce NaNs and Infs, set these to 0 here
+        data = np.where(np.isnan(data), 0, data)
+
+        # Lastly turn the extras into numpy arrays, and catch NaNs or Infs
         extras = {key: ak.to_numpy(df).astype('float32') for key, df in self.extra_dict.items()}
 
         # Now package everything into a list and return
