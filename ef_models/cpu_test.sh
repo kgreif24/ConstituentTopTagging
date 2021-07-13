@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# This is a script for submitting DNN training jobs on the HPC3 cluster.
+# This is a script for submitting EFN training jobs on the HPC3 cluster.
 # Meant for testing jobs in an interactive setting, without GPU
 # acceleration.
 
@@ -19,9 +19,6 @@ echo "Found a node, here's some info: "
 hostname; date
 echo "================================"
 
-# Load needed modules
-module load pytorch/1.5.1
-
 # Get homedir name for future use
 homedir=$(pwd)
 
@@ -36,7 +33,7 @@ echo "In directory ${trdir}"
 ls -lrth
 
 # Next build command to run python training script
-command="python ${homedir}/train_dnn.py --nodes 100 -N 5 -o ./checkpoints"
+command="python ${homedir}/train_efn.py -N 5"
 
 # Run command
 echo "================================"

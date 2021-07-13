@@ -100,17 +100,18 @@ class ClassifierTrainer():
         """
         self.model.load_state_dict(torch.load(filePath, map_location=torch.device('cpu')))
 
-    def train(self, n_epochs, my_device=None, validate=True, checkpoints=None):
+    def train(self, n_epochs, my_device=None, checkpoints=None, patience=20):
         """ train - Actually train the network for the given number of epochs.
 
         Arguments:
             n_epochs (int): The number of epochs to train for
             my_device (torch.device): The device to use, either 'cuda' for GPU
             or 'cpu' otherwise. Usually set by command line argument
-            validate (bool): Set to false to disable validation
             checkpoints (string): If given, save model checkpoints as .pt files
             in the directory pointed to by this string. Model will be saved
             at the end of every epoch
+            patience (int): The number of epochs of no improvement in validation
+            loss before training terminates.
 
         Returns:
             (int) - The index of the epoch at which minimum training loss
@@ -174,14 +175,14 @@ class ClassifierTrainer():
             epoch_train_loss = tr_loss / self.tr_batch_per_epoch
             self.tr_loss_array[epoch] = epoch_train_loss
 
-            # Check if this is new record training loss
-            if epoch_train_loss < min_loss:
-                min_loss = epoch_train_loss
-                min_loss_epoch = epoch
+            # Now validate the model
+            self.validate(my_device=my_device, epoch=epoch) # ugly syntax!
+            epoch_valid_loss = self.val_loss_array[epoch]
 
-            # Now validate if necessary!
-            if validate:
-                self.validate(my_device=my_device, epoch=epoch) # ugly syntax!
+            # Check if this is new record validation loss
+            if epoch_valid_loss < min_loss:
+                min_loss = epoch_valid_loss
+                min_loss_epoch = epoch
 
             # And save model if desired
             if checkpoints != None:
@@ -193,17 +194,17 @@ class ClassifierTrainer():
             print("--Training loss: ", str(self.tr_loss_array[epoch]))
             print("--Validation loss: ", str(self.val_loss_array[epoch]))
 
-            # Lastly we want to exit training loop if training loss has not decreased
+            # Lastly we want to exit training loop if valid loss has not decreased
             # in the last 5 epochs, (after first 6 epochs)
-            if epoch > 5:
-                if min_loss < np.min(self.tr_loss_array[epoch-5:epoch+1]):
+            if epoch >= patience:
+                if min_loss < np.min(self.val_loss_array[epoch-patience:epoch+1]):
 
                     # Trim loss arrays so they don't have trailing zeros
                     self.tr_loss_array = np.trim_zeros(self.tr_loss_array, trim='b')
                     self.val_loss_array = np.trim_zeros(self.val_loss_array, trim='b')
 
                     # And break from training loop
-                    print("\nNo decrease in training loss over last 5 epochs!")
+                    print("\nNo decrease in validation loss over last 5 epochs!")
                     print("Smallest validation loss epoch was ", min_loss_epoch)
                     print("Exiting...")
                     break
