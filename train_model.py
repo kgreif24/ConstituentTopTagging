@@ -19,9 +19,9 @@ import numpy as np
 import matplotlib
 # Matplotlib import setup to use non-GUI backend, comment for interactive
 # graphics
-# matplotlib.use('Agg')
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-plt.style.use('~/Documents/General Programming/mattyplotsalot/allpurpose.mplstyle')
+plt.style.use('~/mattyplotsalot/allpurpose.mplstyle')
 
 from data_handler import DataHandler
 
@@ -59,7 +59,7 @@ batch_size = args.batchSize
 checkpoint_filepath = args.checkDir
 
 # Data parameters
-filepath = "../Data/csauer_initial.root"
+filepath = "~/toptag/samples/csauer_initial.root"
 constit_branches = ['fjet_sortClusNormByPt_pt', 'fjet_sortClusCenterRotFlip_eta',
                     'fjet_sortClusCenterRot_phi', 'fjet_sortClusNormByPt_e']
 extra_branches = ['fjet_training_weight_pt', 'fjet_pt']
@@ -73,7 +73,7 @@ dh_train = DataHandler(filepath, "train", constit_branches,
                       extras=extra_branches, max_constits=max_constits)
 dh_valid = DataHandler(filepath, "valid", constit_branches,
                       extras=extra_branches, max_constits=max_constits)
-# dh_train.plot_branches(constit_branches + extra_branches, directory="./plots/")
+dh_train.plot_branches(constit_branches + extra_branches, directory="./plots/")
 
 # Figure out sample shape
 sample_shape = tuple([batch_size]) + dh_train.sample_shape()
@@ -93,26 +93,29 @@ labels_train = train_arrs[1]
 labels_valid = valid_arrs[1]
 weight_train = train_arrs[2]
 weight_valid = valid_arrs[2]
+train_events = len(weight_train)
+valid_events = len(weight_valid)
 
 # Verify that there are no NaNs in data, labels, or weights
-assert not np.any(np.isnan(z_train))
-assert not np.any(np.isnan(p_train))
-assert not np.any(np.isnan(e_train))
+assert not np.any(np.isnan(train_arrs[0]))
 assert not np.any(np.isnan(labels_train))
 assert not np.any(np.isnan(weight_train))
-
-sys.exit("Stop the train!")
 
 ############################# Build Model ##################################
 print("\nBuilding model...")
 
 if net_type == 'dnn':
-    print("*** DNN model ***")
+    print("\n*** DNN model ***")
 
-    # Get data into proper setting
-    train_data = train_arrs[0]
-    valid_data = valid_arrs[0]
+    # Find input shape
+    input_shape = sample_shape[1] * sample_shape[2]
+
+    # Get data into proper setting (and delete old arrays)
+    train_data = train_arrs[0].reshape((train_events, input_shape))
+    valid_data = valid_arrs[0].reshape((valid_events, input_shape))
     print("Shape of training data: ", np.shape(train_data))
+    del train_arrs
+    del valid_arrs
 
     # Find input shape
     input_shape = sample_shape[1] * sample_shape[2]
@@ -123,7 +126,7 @@ if net_type == 'dnn':
     model.add(tf.keras.layers.Dense(nodes))
     model.add(tf.keras.layers.BatchNormalization(axis=1))
     model.add(tf.keras.layers.ReLU())
-    model.add(tf.ketas.layers.Dense(nodes))
+    model.add(tf.keras.layers.Dense(nodes))
     model.add(tf.keras.layers.BatchNormalization(axis=1))
     model.add(tf.keras.layers.ReLU())
     model.add(tf.keras.layers.Dense(2, activation='softmax'))
@@ -141,6 +144,12 @@ if net_type == 'dnn':
         monitor='val_loss',
         mode='min',
         save_best_only=True
+    )
+
+    # Tensorboard callback
+    tboard_callback = tf.keras.callbacks.TensorBoard(
+        log_dir='logs',
+        histogram_freq=1
     )
 
 elif net_type == 'efn':
@@ -188,7 +197,7 @@ plt.savefig('./plots/initial_output.png', dpi=300)
 ############################### Train EFN #################################
 
 # Train model by calling fit
-print("Training model...")
+print("\nTraining model...")
 train_hist = model.fit(
     train_data,
     labels_train,
@@ -196,8 +205,8 @@ train_hist = model.fit(
     batch_size=batch_size,
     sample_weight=weight_train,
     validation_data=(valid_data, labels_valid, weight_valid),
-    callbacks=[check_callback],
-    verbose=1
+    callbacks=[check_callback, tboard_callback],
+    verbose=2
 )
 
 # Plot losses
@@ -231,8 +240,8 @@ plt.title("EFN output over validation set")
 plt.savefig("./plots/final_output.png", dpi=300)
 
 # Get ROC curve and AUC
-fpr, tpr, thresholds = metrics.roc_curve(raw_labels_valid, preds[:,1])
-auc = metrics.roc_auc_score(raw_labels_valid, preds[:,1])
+fpr, tpr, thresholds = metrics.roc_curve(labels_valid[:,1], preds[:,1])
+auc = metrics.roc_auc_score(labels_valid[:,1], preds[:,1])
 fprinv = 1 / fpr
 
 # Find background rejection at tpr = 0.5, 0.8 working points
