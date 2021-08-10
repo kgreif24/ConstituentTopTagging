@@ -3,7 +3,7 @@ implemented with the keras/energyflow packages. It will make use of the
 DataDumper class to quickly generate np arrays of the jet data.
 
 Author: Kevin Greif
-Last updated 8/6/21
+Last updated 8/10/21
 python3
 """
 
@@ -37,6 +37,12 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument('--type', default='dnn', type=str,
                     help='Type of model to build (dnn, efn, pfn)')
+parser.add_argument('--nodes', default=None, type=int, nargs='*',
+                    help='DNN number of nodes in layers')
+parser.add_argument('--fsizes', default=None, type=int, nargs='*',
+                    help='EFN/PFN number of nodes in f layers')
+parser.add_argument('--phisizes', default=None, type=int, nargs='*',
+                    help='EFN/PFN number of nodes in phi layers')
 parser.add_argument('-N', '--numEpochs', default=100, type=int,
                     help='Number of epochs')
 parser.add_argument('-b', '--batchSize', default=100, type=int,
@@ -51,7 +57,6 @@ args = parser.parse_args()
 
 # Network parameters
 net_type = args.type
-nodes = 50
 
 # Training parameters
 num_epoch = args.numEpochs
@@ -123,12 +128,10 @@ if net_type == 'dnn':
     # Build model
     model = tf.keras.Sequential()
     model.add(tf.keras.Input(shape=input_shape))
-    model.add(tf.keras.layers.Dense(nodes))
-    model.add(tf.keras.layers.BatchNormalization(axis=1))
-    model.add(tf.keras.layers.ReLU())
-    model.add(tf.keras.layers.Dense(nodes))
-    model.add(tf.keras.layers.BatchNormalization(axis=1))
-    model.add(tf.keras.layers.ReLU())
+    for layer in args.nodes:
+        model.add(tf.keras.layers.Dense(layer))
+        model.add(tf.keras.layers.BatchNormalization(axis=1))
+        model.add(tf.keras.layers.ReLU())
     model.add(tf.keras.layers.Dense(2, activation='softmax'))
 
     # Compile model
@@ -138,40 +141,21 @@ if net_type == 'dnn':
         metrics=['accuracy']
     )
 
-    # Earlystopping callback
-    earlystop_callback = tf.keras.callbacks.EarlyStopping(
-        monitor='val_loss',
-        patience=10,
-        mode='min'
-    )
-
-    # Checkpoint callback
-    check_callback = tf.keras.callbacks.ModelCheckpoint(
-        filepath=checkpoint_filepath,
-        monitor='val_loss',
-        mode='min',
-        save_best_only=True
-    )
-
-    # Tensorboard callback
-    tboard_callback = tf.keras.callbacks.TensorBoard(
-        log_dir='logs',
-        histogram_freq=1
-    )
+    # Once model is built, print summary
+    model.summary()
 
 elif net_type == 'efn':
 
-    # Group data into pT and angular information
+    # Group data into pT and angular information (and delete old arrays)
     train_data = [train_arrs[0][:,:,0], train_arrs[0][:,:,1:3]]
     valid_data = [valid_arrs[0][:,:,0], valid_arrs[0][:,:,1:3]]
+    del train_arrs, valid_arrs
 
-    # Build model (NEED TO IMPLEMENT PHI AND F SIZES)
-    efn = ef.archs.EFN(input_dim=2,
-                       Phi_sizes=Phi_sizes,
-                       F_sizes=F_sizes,
-                       filepath=checkpoint_filepath,
-                       patience=50,
-                       earlystop_opts={'monitor': 'val_loss'})
+    # Build model
+    model = ef.archs.EFN(input_dim=2,
+                         Phi_sizes=tuple(args.phisizes),
+                         F_sizes=tuple(args.fsizes)
+                         )
 
 elif net_type == 'pfn':
 
@@ -180,10 +164,6 @@ elif net_type == 'pfn':
 
 else:
     raise ValueError("Model type is not known!")
-
-# Once model is built, print summary
-model.summary()
-
 
 ########################## Initial Evaluation ################################
 
@@ -206,6 +186,27 @@ plt.title("Model output over validation set")
 plt.savefig('./plots/initial_output.png', dpi=300)
 
 ############################### Train EFN #################################
+
+# Earlystopping callback
+earlystop_callback = tf.keras.callbacks.EarlyStopping(
+    monitor='val_loss',
+    patience=10,
+    mode='min'
+)
+
+# Checkpoint callback
+check_callback = tf.keras.callbacks.ModelCheckpoint(
+    filepath=checkpoint_filepath,
+    monitor='val_loss',
+    mode='min',
+    save_best_only=True
+)
+
+# Tensorboard callback
+tboard_callback = tf.keras.callbacks.TensorBoard(
+    log_dir='logs',
+    histogram_freq=1
+)
 
 # Train model by calling fit
 print("\nTraining model...")
