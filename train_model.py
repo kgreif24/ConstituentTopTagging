@@ -133,9 +133,16 @@ if net_type == 'dnn':
 
     # Compile model
     model.compile(
-        optimizer='adam',
+        optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3),
         loss=tf.keras.losses.BinaryCrossentropy(from_logits=False),
         metrics=['accuracy']
+    )
+
+    # Earlystopping callback
+    earlystop_callback = tf.keras.callbacks.EarlyStopping(
+        monitor='val_loss',
+        patience=10,
+        mode='min'
     )
 
     # Checkpoint callback
@@ -174,6 +181,9 @@ elif net_type == 'pfn':
 else:
     raise ValueError("Model type is not known!")
 
+# Once model is built, print summary
+model.summary()
+
 
 ########################## Initial Evaluation ################################
 
@@ -188,10 +198,11 @@ hist_bins = np.linspace(0, 1.0, 100)
 plt.clf()
 plt.hist(preds_sig[:,1], bins=hist_bins, alpha=0.5, label='Signal')
 plt.hist(preds_bkg[:,1], bins=hist_bins, alpha=0.5, label='Background')
+plt.yscale('log')
 plt.legend()
 plt.ylabel("Counts")
-plt.xlabel("EFN output")
-plt.title("EFN output over validation set")
+plt.xlabel("Model output")
+plt.title("Model output over validation set")
 plt.savefig('./plots/initial_output.png', dpi=300)
 
 ############################### Train EFN #################################
@@ -205,7 +216,7 @@ train_hist = model.fit(
     batch_size=batch_size,
     sample_weight=weight_train,
     validation_data=(valid_data, labels_valid, weight_valid),
-    callbacks=[check_callback, tboard_callback],
+    callbacks=[earlystop_callback, check_callback, tboard_callback],
     verbose=2
 )
 
@@ -233,10 +244,11 @@ hist_bins = np.linspace(0, 1.0, 100)
 plt.clf()
 plt.hist(preds_sig[:,1], bins=hist_bins, alpha=0.5, label='Signal')
 plt.hist(preds_bkg[:,1], bins=hist_bins, alpha=0.5, label='Background')
+plt.yscale('log')
 plt.legend()
 plt.ylabel("Counts")
-plt.xlabel("EFN output")
-plt.title("EFN output over validation set")
+plt.xlabel("Model output")
+plt.title("Model output over validation set")
 plt.savefig("./plots/final_output.png", dpi=300)
 
 # Get ROC curve and AUC
