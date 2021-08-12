@@ -60,7 +60,7 @@ max_constits = args.maxConstits
 # Now build dhs and use them to plot all branches of interest
 print("Building data object...")
 dh_valid = DataHandler(filepath, "valid", constit_branches,
-                      extras=extra_branches, max_constits=max_constits)
+                       extras=extra_branches, max_constits=max_constits)
 
 # Figure out sample shape
 sample_shape = tuple([batch_size]) + dh_valid.sample_shape()
@@ -86,6 +86,10 @@ assert not np.any(np.isnan(weight_valid))
 ############################# Load Model ##################################
 print("\nLoading model...")
 
+# Process data for EFN (REFACTOR!!)
+valid_data = [valid_arrs[0][:,:,0], valid_arrs[0][:,:,1:3]]
+del valid_arrs
+
 # Load model
 model = tf.keras.models.load_model(args.file)
 model.summary()
@@ -107,7 +111,7 @@ plt.legend()
 plt.ylabel("Counts")
 plt.xlabel("Model output")
 plt.title("Model output over validation set")
-plt.savefig('./eval/sEFN_csauer/initial_output.png', dpi=300)
+plt.savefig('./outfiles/initial_output.png', dpi=300)
 
 # Get ROC curve and AUC
 fpr, tpr, thresholds = metrics.roc_curve(labels_valid[:,1], preds[:,1])
@@ -129,4 +133,4 @@ plt.plot(tpr, fprinv)
 plt.yscale('log')
 plt.ylabel('Background rejection')
 plt.xlabel('Signal efficiency')
-plt.savefig("./eval/sEFN_csauer/roc.png", dpi=300)
+plt.savefig("./outfiles/roc.png", dpi=300)

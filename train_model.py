@@ -129,8 +129,8 @@ if net_type == 'dnn':
     model = tf.keras.Sequential()
     model.add(tf.keras.Input(shape=input_shape))
     for layer in args.nodes:
-        model.add(tf.keras.layers.Dense(layer))
-        model.add(tf.keras.layers.BatchNormalization(axis=1))
+        model.add(tf.keras.layers.Dense(layer, kernel_initializer='he_uniform'))
+        # model.add(tf.keras.layers.BatchNormalization(axis=1))
         model.add(tf.keras.layers.ReLU())
     model.add(tf.keras.layers.Dense(2, activation='softmax'))
 
@@ -154,7 +154,8 @@ elif net_type == 'efn':
     # Build model
     model = ef.archs.EFN(input_dim=2,
                          Phi_sizes=tuple(args.phisizes),
-                         F_sizes=tuple(args.fsizes)
+                         F_sizes=tuple(args.fsizes),
+                         optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3)
                          )
 
 elif net_type == 'pfn':
@@ -178,7 +179,6 @@ hist_bins = np.linspace(0, 1.0, 100)
 plt.clf()
 plt.hist(preds_sig[:,1], bins=hist_bins, alpha=0.5, label='Signal')
 plt.hist(preds_bkg[:,1], bins=hist_bins, alpha=0.5, label='Background')
-plt.yscale('log')
 plt.legend()
 plt.ylabel("Counts")
 plt.xlabel("Model output")
@@ -190,7 +190,7 @@ plt.savefig('./plots/initial_output.png', dpi=300)
 # Earlystopping callback
 earlystop_callback = tf.keras.callbacks.EarlyStopping(
     monitor='val_loss',
-    patience=10,
+    patience=20,
     mode='min'
 )
 
@@ -245,7 +245,6 @@ hist_bins = np.linspace(0, 1.0, 100)
 plt.clf()
 plt.hist(preds_sig[:,1], bins=hist_bins, alpha=0.5, label='Signal')
 plt.hist(preds_bkg[:,1], bins=hist_bins, alpha=0.5, label='Background')
-plt.yscale('log')
 plt.legend()
 plt.ylabel("Counts")
 plt.xlabel("Model output")
