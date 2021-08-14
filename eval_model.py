@@ -35,6 +35,8 @@ print("Num GPUs Available:", len(tf.config.list_physical_devices('GPU')))
 
 parser = argparse.ArgumentParser()
 
+parser.add_argument('--type', default='dnn', type=str,
+                    help='Type of model to build (dnn, efn, pfn)')
 parser.add_argument('-b', '--batchSize', default=100, type=int,
                     help='Batch size')
 parser.add_argument('--maxConstits', default=80, type=int,
@@ -46,6 +48,7 @@ args = parser.parse_args()
 ###################### Set parameters for evaluation #######################
 
 # Net parameters
+net_type = args.type
 batch_size = args.batchSize
 
 # Data parameters
@@ -86,13 +89,26 @@ assert not np.any(np.isnan(weight_valid))
 ############################# Load Model ##################################
 print("\nLoading model...")
 
-# Process data for EFN (REFACTOR!!)
-valid_data = [valid_arrs[0][:,:,0], valid_arrs[0][:,:,1:3]]
+# Process data depending on model type
+if net_type == 'dnn':
+    input_shape = sample_shape[1] * sample_shape[2]
+    valid_data = valid_arrs[0].reshape((valid_events, input_shape))
+elif net_type == 'efn':
+    valid_data = [valid_arrs[0][:,:,0], valid_arrs[0][:,:,1:3]]
+elif net_type == 'pfn':
+    pass
+else:
+    raise ValueError("Model type not recognized!")
+
+print("Shape of validation data: ", np.shape(valid_data))
 del valid_arrs
 
 # Load model
 model = tf.keras.models.load_model(args.file)
 model.summary()
+
+# Initialize softmax layer
+softmax = tf.keras.layers.Softmax(axis=1)
 
 ########################## Evaluation ################################
 
@@ -100,6 +116,7 @@ print("\nEvaluation...")
 preds = model.predict(valid_data, batch_size=batch_size)
 
 # Make a histogram of network output, separated into signal/background
+preds = softmax(preds)
 preds_sig = preds[labels_valid[:,1] == 1]
 preds_bkg = preds[labels_valid[:,1] == 0]
 hist_bins = np.linspace(0, 1.0, 100)
