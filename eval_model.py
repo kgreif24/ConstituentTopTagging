@@ -35,17 +35,24 @@ print("Num GPUs Available:", len(tf.config.list_physical_devices('GPU')))
 
 parser = argparse.ArgumentParser()
 
+parser.add_argument('--type', default='dnn', type=str, nargs='+',
+                    help='Type of model to build (dnn, efn, pfn)')
 parser.add_argument('-b', '--batchSize', default=100, type=int,
                     help='Batch size')
 parser.add_argument('--maxConstits', default=80, type=int,
                     help='Number of constituents to include per event')
-parser.add_argument('--file', default=None, type=str,
+parser.add_argument('--file', default=None, type=str, nargs='+',
                     help='File name of network checkpoint')
 args = parser.parse_args()
+
+if len(args.type) != len(args.file):
+    raise ValueError("Length of type and file command line args must match!")
 
 ###################### Set parameters for evaluation #######################
 
 # Net parameters
+net_type = args.type
+net_file = args.file
 batch_size = args.batchSize
 
 # Data parameters
@@ -83,54 +90,68 @@ assert not np.any(np.isnan(valid_arrs[0]))
 assert not np.any(np.isnan(labels_valid))
 assert not np.any(np.isnan(weight_valid))
 
-############################# Load Model ##################################
-print("\nLoading model...")
+############################# Evaluation Loop #############################
 
-# Process data for EFN (REFACTOR!!)
-valid_data = [valid_arrs[0][:,:,0], valid_arrs[0][:,:,1:3]]
-del valid_arrs
+for file, type in zip(net_file, net_type):
 
-# Load model
-model = tf.keras.models.load_model(args.file)
-model.summary()
+    # Load model
+    print("\nLoading model from ", file)
+    model = tf.keras.models.load_model(file)
+    model.summary()
 
-########################## Evaluation ################################
+    # Process data depending on model type
+    if type == 'dnn':
+        input_shape = sample_shape[1] * sample_shape[2]
+        valid_data = valid_arrs[0].reshape((valid_events, input_shape))
+    elif type == 'efn':
+        valid_data = [valid_arrs[0][:,:,0], valid_arrs[0][:,:,1:3]]
+    elif type == 'pfn':
+        pass
+    else:
+        raise ValueError("Model type not recognized!")
 
-print("\nEvaluation...")
-preds = model.predict(valid_data, batch_size=batch_size)
+    print("Shape of validation data: ", np.shape(valid_data))
 
-# Make a histogram of network output, separated into signal/background
-preds_sig = preds[labels_valid[:,1] == 1]
-preds_bkg = preds[labels_valid[:,1] == 0]
-hist_bins = np.linspace(0, 1.0, 100)
+    # # Initialize softmax layer if needed
+    # softmax = tf.keras.layers.Softmax(axis=1)
 
-plt.clf()
-plt.hist(preds_sig[:,1], bins=hist_bins, alpha=0.5, label='Signal')
-plt.hist(preds_bkg[:,1], bins=hist_bins, alpha=0.5, label='Background')
-plt.legend()
-plt.ylabel("Counts")
-plt.xlabel("Model output")
-plt.title("Model output over validation set")
-plt.savefig('./outfiles/initial_output.png', dpi=300)
+    # Evaluate model
+    print("\nEvaluation for ", type)
+    preds = model.predict(valid_data, batch_size=batch_size)
 
-# Get ROC curve and AUC
-fpr, tpr, thresholds = metrics.roc_curve(labels_valid[:,1], preds[:,1])
-auc = metrics.roc_auc_score(labels_valid[:,1], preds[:,1])
-fprinv = 1 / fpr
+    # Make a histogram of network output, separated into signal/background
+    # preds = softmax(preds)
+    preds_sig = preds[labels_valid[:,1] == 1]
+    preds_bkg = preds[labels_valid[:,1] == 0]
+    hist_bins = np.linspace(0, 1.0, 100)
 
-# Find background rejection at tpr = 0.5, 0.8 working points
-wp_p5 = np.argmax(tpr > 0.5)
-wp_p8 = np.argmax(tpr > 0.8)
+    plt.clf()
+    plt.hist(preds_sig[:,1], bins=hist_bins, alpha=0.5, label='Signal')
+    plt.hist(preds_bkg[:,1], bins=hist_bins, alpha=0.5, label='Background')
+    plt.legend()
+    plt.ylabel("Counts")
+    plt.xlabel("Model output")
+    plt.title("Model output over validation set")
+    plt.savefig('./outfiles/' + type + '.png', dpi=300)
 
-# Finally print information on model performance
-print("Background rejection at 0.5 signal efficiency: ", fprinv[wp_p5])
-print("Background rejection at 0.8 signal efficiency: ", fprinv[wp_p8])
-print("AUC score: ", auc)
+    # Get ROC curve and AUC
+    fpr, tpr, thresholds = metrics.roc_curve(labels_valid[:,1], preds[:,1])
+    auc = metrics.roc_auc_score(labels_valid[:,1], preds[:,1])
+    fprinv = 1 / fpr
 
-# Make an inverse roc plot. Take 1/fpr and plot this against tpr
-plt.clf()
-plt.plot(tpr, fprinv)
-plt.yscale('log')
-plt.ylabel('Background rejection')
-plt.xlabel('Signal efficiency')
-plt.savefig("./outfiles/roc.png", dpi=300)
+    # Find background rejection at tpr = 0.5, 0.8 working points
+    wp_p5 = np.argmax(tpr > 0.5)
+    wp_p8 = np.argmax(tpr > 0.8)
+
+    # Finally print information on model performance
+    print("Background rejection at 0.5 signal efficiency: ", fprinv[wp_p5])
+    print("Background rejection at 0.8 signal efficiency: ", fprinv[wp_p8])
+    print("AUC score: ", auc)
+
+# # Make an inverse roc plot. Take 1/fpr and plot this against tpr
+# plt.clf()
+# plt.plot(tpr, fprinv)
+# plt.yscale('log')
+# plt.ylabel('Background rejection')
+# plt.xlabel('Signal efficiency')
+# plt.savefig("./outfiles/roc.png", dpi=300)

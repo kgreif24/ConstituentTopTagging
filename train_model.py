@@ -132,12 +132,12 @@ if net_type == 'dnn':
         model.add(tf.keras.layers.Dense(layer, kernel_initializer='he_uniform'))
         # model.add(tf.keras.layers.BatchNormalization(axis=1))
         model.add(tf.keras.layers.ReLU())
-    model.add(tf.keras.layers.Dense(2, activation='softmax'))
+    model.add(tf.keras.layers.Dense(2, kernel_initializer='he_uniform'))
 
     # Compile model
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3),
-        loss=tf.keras.losses.BinaryCrossentropy(from_logits=False),
+        loss=tf.keras.losses.CategoricalCrossentropy(from_logits=False),
         metrics=['accuracy']
     )
 
@@ -152,11 +152,13 @@ elif net_type == 'efn':
     del train_arrs, valid_arrs
 
     # Build model
-    model = ef.archs.EFN(input_dim=2,
-                         Phi_sizes=tuple(args.phisizes),
-                         F_sizes=tuple(args.fsizes),
-                         optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3)
-                         )
+    model = ef.archs.EFN(
+        input_dim=2,
+        Phi_sizes=tuple(args.phisizes),
+        F_sizes=tuple(args.fsizes),
+        optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3),
+        loss=tf.keras.losses.BinaryCrossentropy(from_logits=True)
+    )
 
 elif net_type == 'pfn':
 
