@@ -387,11 +387,11 @@ class DataBuilder(src.myutils.walker.Walker):
 
     # Get the pT as we want a flat pT spectra
     arr = root_numpy.root2array(self.fout, self.info["TreeName"], branches=[pt, "fjet_signal", "fjet_testing_weight_pt"])
-    # utils.remove_branch(self.fout, self.info["TreeName"], "fjet_testing_weight_pt")
+    utils.remove_branch(self.fout, self.info["TreeName"], "fjet_testing_weight_pt")
 
     # Get correction factors for testing weights
     w = utils.correct_weight(arr["fjet_signal"], arr["fjet_testing_weight_pt"])
-    utils.add_branch(self.fout, self.info["TreeName"], w, "fjet_correct_testing_weight_pt")
+    utils.add_branch(self.fout, self.info["TreeName"], w, "fjet_testing_weight_pt")
 
     # Compute weights to flatten plt spectra
     w = utils.train_weights(arr["fjet_signal"], arr[pt])
@@ -404,7 +404,7 @@ class DataBuilder(src.myutils.walker.Walker):
     # Some events come with very large weights(?); make a cut
     ROOT.ROOT.EnableImplicitMT(self.n_threads)
     RDF = ROOT.RDataFrame(self.info["TreeName"], self.fout) \
-      .Filter("%s<100" % __train_weight__).Filter("%s<100" % "fjet_correct_testing_weight_pt") \
+      .Filter("%s<100" % __train_weight__).Filter("%s<100" % "fjet_testing_weight_pt") \
       .Snapshot(self.info["TreeName"], self.fout.replace(".root", ".limit_weights.root"))
     subprocess.call("mv %s %s" % (self.fout.replace(".root", ".limit_weights.root"), self.fout), shell=True)
  
@@ -565,9 +565,11 @@ class DataBuilder(src.myutils.walker.Walker):
     with src.myutils.profile.Profile("Compute training weights"):
       self._add_weights()
 
-    # Split into training and testing set
-    with src.myutils.profile.Profile("Split data into training and validation data"):
-      self._split()
+    # Comment out train/test split, since we're going to use k-fold validation
+    
+    # # Split into training and testing set
+    # with src.myutils.profile.Profile("Split data into training and validation data"):
+    #   self._split()
 
     # Save as ROOT file
     with src.myutils.profile.Profile("Save data to ROOT file"):
