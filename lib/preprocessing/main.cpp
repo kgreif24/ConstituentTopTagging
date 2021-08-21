@@ -39,23 +39,39 @@ auto mass = [](const ROOT::RVec<float> & pt, const ROOT::RVec<float> & eta, cons
   return m;
 };
 
-auto shift_calc = [](const ROOT::RVec<float> & column, const ROOT::RVec<float> & w)
-{
-  float mu = ROOT::VecOps::Dot(column, w) / ROOT::VecOps::Sum(w);
-  return mu;
-};
-
-auto shift_eta = [](const ROOT::RVec<float> & eta, float & mu)
+auto shift_eta = [](const ROOT::RVec<float> & eta, const ROOT::RVec<float> & w)
 {
   ROOT::RVec<float> eta_shift(eta);
+  float mu = ROOT::VecOps::Dot(eta, w) / ROOT::VecOps::Sum(w);
   for(auto & el : eta_shift) el -= mu;
   return eta_shift;
 };
 
 
-auto shift_phi = [](const ROOT::RVec<float> & phi, float & mu)
+auto shift_phi = [](const ROOT::RVec<float> & phi, const ROOT::RVec<float> & w)
 {
+
+  // First make a copy of phi to modify
   ROOT::RVec<float> phi_shift(phi);
+
+  // We first need to fix jets on -pi, pi discontinuity in phi
+  // Find max and min phi of constituents
+  float max_phi = ROOT::VecOps::Max(phi);
+  float min_phi = ROOT::VecOps::Min(phi);
+
+  // Now if difference between max and min is > pi, we need to flip upper/lower half planes
+  if (max_phi - min_phi > TMath::Pi()) {
+    // Make vectors with phi+pi and phi-pi
+    ROOT::RVec<float> phi_m_pi = phi - TMath::Pi();
+    ROOT::RVec<float> phi_p_pi = phi + TMath::Pi();
+    // Call Where function to flip upper/lower half plane
+    ROOT::RVec<float> phi_shift = ROOT::VecOps::Where(phi > 0, phi_m_pi, phi_p_pi);
+  }
+
+  // Calculate shift
+  float mu = ROOT::VecOps::Dot(phi_shift, w) / ROOT::VecOps::Sum(w);
+
+  // Loop through phi_shift and apply shift to each element
   for(auto & el : phi_shift)
   {
     el -= mu;
@@ -96,10 +112,8 @@ auto standardize = [](const ROOT::RVec<float> & x, ROOT::RVec<float> & w)
 auto pca_angle = [](const ROOT::RVec<float> & eta, const ROOT::RVec<float> & phi, const ROOT::RVec<float> & e)
 {
   // Shift eta and phi of the constituents accordingly
-  float the_eta_shift = shift_calc(eta, e);
-  float the_phi_shift = shift_calc(phi, e);
-  ROOT::RVec<float> deta = shift_eta(eta, the_eta_shift);
-  ROOT::RVec<float> dphi = shift_phi(phi, the_phi_shift);
+  ROOT::RVec<float> deta = shift_eta(eta, e);
+  ROOT::RVec<float> dphi = shift_phi(phi, e);
 
   // Get total energy of this jet basedon the individual constituents (not corrected)
   float e_tot = ROOT::VecOps::Sum(e);
@@ -198,12 +212,9 @@ int main (int argc, char **argv)
     .Define("fjet_sortClus_phi", sort, {"fjet_clus_phi", "_fjet_sort_idx"})
     .Define("fjet_sortClus_e",   sort, {"fjet_clus_E",   "_fjet_sort_idx"})
     .Define("fjet_sortClus_m",    mass, {"fjet_sortClus_pt", "fjet_sortClus_eta", "fjet_sortClus_phi", "fjet_sortClus_e"})
-    //Calculate component shifts for eta and phi
-    .Define("fjet_etaShift", shift_calc, {"fjet_sortClus_eta", "fjet_sortClus_e"})
-    .Define("fjet_phiShift", shift_calc, {"fjet_sortClus_phi", "fjet_sortClus_e"})
     // Shift components
-    .Define("_fjet_sortClusCenter_eta", shift_eta, {"fjet_sortClus_eta", "fjet_etaShift"})
-    .Define("_fjet_sortClusCenter_phi", shift_phi, {"fjet_sortClus_phi", "fjet_phiShift"})
+    .Define("_fjet_sortClusCenter_eta", shift_eta, {"fjet_sortClus_eta", "fjet_sortClus_e"})
+    .Define("_fjet_sortClusCenter_phi", shift_phi, {"fjet_sortClus_phi", "fjet_sortClus_e"})
     // Shift and rotate
     .Define("_fjet_sortClusCenterRot_eta", rot_x, {"_fjet_sortClusCenter_eta", "_fjet_sortClusCenter_phi", "fjet_anglePCA"})
     .Define("fjet_sortClusCenterRot_phi",  rot_y, {"_fjet_sortClusCenter_eta", "_fjet_sortClusCenter_phi", "fjet_anglePCA"})
