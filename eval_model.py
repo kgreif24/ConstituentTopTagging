@@ -1,28 +1,33 @@
 """ eval_model.py - This script will evaluate a pretrained network of type
-DNN, EFN, or PFN. It will make use of the DataHandler class to quickly
+hlDNN, DNN, EFN, or PFN. It will make use of the DataHandler class to quickly
 generate np arrays of the jet data.
 
 Author: Kevin Greif
-Last updated 8/11/21
+Last updated 9/9/21
 python3
 """
 
+# Standard imports
 import sys, os
 import argparse
 
+# Package imports
 import energyflow as ef
 from energyflow.archs import EFN
 import tensorflow as tf
 import sklearn.metrics as metrics
 import numpy as np
 
+# MPL imports
 import matplotlib
 # Matplotlib import setup to use non-GUI backend, comment for interactive
 # graphics
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 plt.style.use('~/mattyplotsalot/allpurpose.mplstyle')
+import colorcet as cc
 
+# Custom imports
 from data_handler import DataHandler
 
 
@@ -35,7 +40,7 @@ print("Num GPUs Available:", len(tf.config.list_physical_devices('GPU')))
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument('--type', default='dnn', type=str, nargs='+',
+parser.add_argument('--type', default=None, type=str, nargs='+',
                     help='Type of model to build (dnn, efn, pfn)')
 parser.add_argument('-b', '--batchSize', default=100, type=int,
                     help='Batch size')
@@ -43,101 +48,137 @@ parser.add_argument('--maxConstits', default=80, type=int,
                     help='Number of constituents to include per event')
 parser.add_argument('--file', default=None, type=str, nargs='+',
                     help='File name of network checkpoint')
+parser.add_argument('--names', default=None, type=str, nargs='+',
+                    help='Names of model for plotting/saving')
 args = parser.parse_args()
 
-if len(args.type) != len(args.file):
-    raise ValueError("Length of type and file command line args must match!")
+if (len(args.type) != len(args.file)) and (len(args.type) != len(args.names)):
+    raise ValueError("Length of type, names, and file command line args must match!")
 
 ###################### Set parameters for evaluation #######################
 
 # Net parameters
 net_type = args.type
 net_file = args.file
+net_name = args.names
 batch_size = args.batchSize
 
 # Data parameters
-filepath = "~/toptag/samples/csauer_initial.root"
+filepath = "/pub/kgreif/samples/sample_4p2M_nbpt.root"
 constit_branches = ['fjet_sortClusNormByPt_pt', 'fjet_sortClusCenterRotFlip_eta',
-                    'fjet_sortClusCenterRot_phi', 'fjet_sortClusNormByPt_e']
-extra_branches = ['fjet_training_weight_pt', 'fjet_pt']
+                  'fjet_sortClusCenterRot_phi', 'fjet_sortClusNormByPt_e']
+hl_branches = ['fjet_Tau1_wta', 'fjet_Tau2_wta', 'fjet_Tau3_wta', 'fjet_Split12',
+                  'fjet_Split23', 'fjet_ECF1', 'fjet_ECF2', 'fjet_ECF3', 'fjet_C2',
+                  'fjet_D2', 'fjet_Qw']
+extra_branches = ['fjet_match_weight_pt', 'fjet_pt']
 max_constits = args.maxConstits
 
 ############################# Process Data ################################
 
 # Now build dhs and use them to plot all branches of interest
 print("Building data object...")
-dh_valid = DataHandler(filepath, "valid", constit_branches,
-                       extras=extra_branches, max_constits=max_constits)
+constit_dh = DataHandler(filepath, "FlatSubstructureJetTree", constit_branches,
+                         extras=extra_branches, max_constits=max_constits)
+hl_dh = DataHandler(filepath, "FlatSubstructureJetTree", hl_branches,
+                    extras=extra_branches, max_constits=0)
 
 # Figure out sample shape
-sample_shape = tuple([batch_size]) + dh_valid.sample_shape()
+constit_sample_shape = tuple([batch_size]) + constit_dh.sample_shape()
+hl_sample_shape = tuple([batch_size]) + hl_dh.sample_shape()
 
 # Now make np arrays out of the data
 print("\nBuilding data arrays...")
-valid_arrs = dh_valid.np_arrays()
+constit_arrs = constit_dh.np_arrays()
+hl_arrs = hl_dh.np_arrays()
 
 # Delete dhs to save memory
-del dh_valid
+del constit_dh
+del hl_dh
 
 # Split data arrays common to all model types
 print("\nSplitting data arrays...")
-labels_valid = valid_arrs[1]
-weight_valid = valid_arrs[2]
-valid_events = len(weight_valid)
+constit_data = constit_arrs[0]
+constit_labels = constit_arrs[1]
+constit_weight = constit_arrs[2]
+constit_events = len(constit_weight)
+hl_data = hl_arrs[0]
+hl_labels = hl_arrs[1]
+hl_weight = hl_arrs[2]
+hl_events = len(hl_weight)
 
-# Verify that there are no NaNs in data, labels, or weights
-assert not np.any(np.isnan(valid_arrs[0]))
-assert not np.any(np.isnan(labels_valid))
-assert not np.any(np.isnan(weight_valid))
+# Separate out fold ######################## Debug!
+
+valid_fold_index = 0
+constit_data = np.squeeze(np.array_split(constit_data, 5, axis=0).pop(valid_fold_index))
+constit_labels = np.squeeze(np.array_split(constit_labels, 5, axis=0).pop(valid_fold_index))
+constit_weight = np.squeeze(np.array_split(constit_weight, 5, axis=0).pop(valid_fold_index))
+constit_events = len(constit_weight)
+hl_data = np.squeeze(np.array_split(hl_data, 5, axis=0).pop(valid_fold_index))
+hl_labels = np.squeeze(np.array_split(hl_labels, 5, axis=0).pop(valid_fold_index))
+hl_weight = np.squeeze(np.array_split(hl_weight, 5, axis=0).pop(valid_fold_index))
+hl_events = len(hl_weight)
+
+# Verify that there are no NaNs in data
+assert not np.any(np.isnan(constit_data))
+assert not np.any(np.isnan(hl_data))
 
 ############################# Evaluation Loop #############################
 
-for file, type in zip(net_file, net_type):
+for file, type, name in zip(net_file, net_type, net_name):
 
     # Load model
-    print("\nLoading model from ", file)
+    print("\nLoading model ", name)
     model = tf.keras.models.load_model(file)
+
+    # Either way print summary
     model.summary()
 
     # Process data depending on model type
     if type == 'dnn':
-        input_shape = sample_shape[1] * sample_shape[2]
-        valid_data = valid_arrs[0].reshape((valid_events, input_shape))
+        input_shape = np.prod(constit_sample_shape[1:])
+        valid_data = constit_data.reshape((constit_events, input_shape))
+        valid_labels = constit_labels
+        print("Shape of validation data: ", np.shape(valid_data))
+    elif type == 'hldnn':
+        valid_data = hl_data
+        valid_labels = hl_labels
+        print("Shape of validation data: ", np.shape(valid_data))
     elif type == 'efn':
-        valid_data = [valid_arrs[0][:,:,0], valid_arrs[0][:,:,1:3]]
+        valid_data = [constit_data[:,:,0], constit_data[:,:,1:3]]
+        print("Shape of validation data (features): ", len(valid_data))
     elif type == 'pfn':
-        pass
+        valid_data = constit_data
+        print("Shape of validation data:", np.shape(valid_data))
     else:
         raise ValueError("Model type not recognized!")
 
-    print("Shape of validation data: ", np.shape(valid_data))
-
-    # # Initialize softmax layer if needed
-    # softmax = tf.keras.layers.Softmax(axis=1)
-
     # Evaluate model
-    print("\nEvaluation for ", type)
+    print("\nEvaluation for ", name)
     preds = model.predict(valid_data, batch_size=batch_size)
 
     # Make a histogram of network output, separated into signal/background
-    # preds = softmax(preds)
-    preds_sig = preds[labels_valid[:,1] == 1]
-    preds_bkg = preds[labels_valid[:,1] == 0]
+    preds_sig = preds[valid_labels[:,1] == 1]
+    preds_bkg = preds[valid_labels[:,1] == 0]
     hist_bins = np.linspace(0, 1.0, 100)
 
-    plt.clf()
+    plt.figure(1)
     plt.hist(preds_sig[:,1], bins=hist_bins, alpha=0.5, label='Signal')
     plt.hist(preds_bkg[:,1], bins=hist_bins, alpha=0.5, label='Background')
     plt.legend()
     plt.ylabel("Counts")
     plt.xlabel("Model output")
-    plt.title("Model output over validation set")
-    plt.savefig('./outfiles/' + type + '.png', dpi=300)
+    plt.title(name + " output over validation set")
+    plt.savefig('./outfiles/' + name + '.png', dpi=300)
+    plt.clf()
 
     # Get ROC curve and AUC
-    fpr, tpr, thresholds = metrics.roc_curve(labels_valid[:,1], preds[:,1])
-    auc = metrics.roc_auc_score(labels_valid[:,1], preds[:,1])
+    fpr, tpr, thresholds = metrics.roc_curve(valid_labels[:,1], preds[:,1])
+    auc = metrics.roc_auc_score(valid_labels[:,1], preds[:,1])
     fprinv = 1 / fpr
+
+    # Plot inverse roc curve
+    plt.figure(2)
+    plt.plot(tpr, fprinv, label=name)
 
     # Find background rejection at tpr = 0.5, 0.8 working points
     wp_p5 = np.argmax(tpr > 0.5)
@@ -148,10 +189,10 @@ for file, type in zip(net_file, net_type):
     print("Background rejection at 0.8 signal efficiency: ", fprinv[wp_p8])
     print("AUC score: ", auc)
 
-# # Make an inverse roc plot. Take 1/fpr and plot this against tpr
-# plt.clf()
-# plt.plot(tpr, fprinv)
-# plt.yscale('log')
-# plt.ylabel('Background rejection')
-# plt.xlabel('Signal efficiency')
-# plt.savefig("./outfiles/roc.png", dpi=300)
+# Add finishing touches to inverse roc plot
+plt.figure(2)
+plt.yscale('log')
+plt.legend()
+plt.ylabel('Background rejection')
+plt.xlabel('Signal efficiency')
+plt.savefig("./outfiles/roc.png", dpi=300)

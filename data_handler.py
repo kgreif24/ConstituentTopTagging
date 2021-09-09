@@ -37,7 +37,8 @@ class DataHandler():
             Examples are event weights, jetPt, etc.
             max_constits (int): The maximum number of constituents to keep
             in a single jet. Jets with less than this will be padded, jets
-            with more will be padded.
+            with more will be padded. If set to 0, assume we are considering
+            only high level jet information.
 
         Returns:
             None
@@ -115,11 +116,20 @@ class DataHandler():
                 thisBranchSig = ak.flatten(thisBranchSig)
                 thisBranchBkg = ak.flatten(thisBranchBkg)
 
+
+            # Some HL features have exit codes (-999), these events are ignored
+            # in training. Remove these numbers from plotting here
+            thisBranchSig = thisBranchSig[thisBranchSig != -999]
+            thisBranchBkg = thisBranchBkg[thisBranchBkg != -999]
+
             # Can now make a histogram
             n, bins, patches = plt.hist(thisBranchBkg, alpha=0.5, label='Background')
             plt.hist(thisBranchSig, bins=bins, alpha=0.5, label='Signal')
             if log:
                 plt.yscale('log')
+            axes = plt.gca()
+            bottom, top = axes.get_ylim()
+            axes.set_ylim([1, top])
             plt.title(branch_name)
             plt.legend()
             if directory != None:
@@ -144,32 +154,68 @@ class DataHandler():
         # array. Hardcode 2 classes (signal, background)
         cat_labels =  np.eye(2, dtype='float32')[self.labels]
 
-        # Next pad jets with less than the maximum number of constituents
-        # with 0's, and trucate jets with more than the maximum.
-        # Assume only input features will be of variable length, need to be
-        # padded.
-        # Also alter the input_dict in place to cut down on memory consumption
+        # Initialize drop index list for cut event indeces
+        drop_index_list = []
+
+        # Loop through input dict features
         for key, data_feature in self.input_dict.items():
-            # Pad with None values, and then replace None with 0's
-            df_none = ak.pad_none(data_feature, self.max_constits, axis=1, clip=True)
-            df_zero = ak.fill_none(df_none, 0)
-            # Set ak_dict entry to df_zero
-            self.input_dict[key] = df_zero
+
+            # We either have constituent data (awkward arrays with variable length per jet)
+            # or high level data (arrays with equal length per jet). Treat these cases differently
+            typestr = str(ak.type(data_feature))
+            
+            # Constituent case
+            if 'var' in typestr:
+
+                # Pad jets with less than the maximum number of constituents
+                # with 0's, and trucate jets with more than the maximum.
+                df_zero = ak.pad_none(data_feature, self.max_constits, axis=1, clip=True)
+                df_zero = ak.fill_none(df_zero, 0)
+
+                # Set ak_dict entry to df_zero, alter in place to save memory
+                self.input_dict[key] = df_zero
+
+            # High level case
+            else:
+
+                # Some high level variables come with exit codes, set to -999
+                # Drop these events by tracking indeces of events with these codes
+                exit_indeces = np.asarray(data_feature == -999).nonzero()[0]
+                drop_index_list.append(exit_indeces)
+
+                # For events that are left, we want to standardize inputs
+                # Subtract off mean and divide by standard deviation
+                # (Note -999 events will get shifted but this is fine since we already found
+                # their indeces)
+                good_events = data_feature[data_feature != -999]
+                mean = np.mean(good_events)
+                stddev = np.std(good_events)
+                self.input_dict[key] = (data_feature - mean) / stddev
 
         # Now combine features in input_dict into a rectangular array using
         # numpy.stack. First convert to numpy
         np_dict = {key: ak.to_numpy(df).astype('float32') for key, df in self.input_dict.items()}
+
         # Call numpy.stack
-        data = np.dstack(tuple(np_dict.values()))
+        data = np.squeeze(np.dstack(tuple(np_dict.values())))
+        del np_dict
 
         # Preprocessing can introduce NaNs and Infs, set these to 0 here
-        data = np.where(np.isnan(data), 0, data)
+        np.nan_to_num(data, copy=False)
 
-        # Lastly turn the extras into numpy arrays
-        extras = {key: ak.to_numpy(df).astype('float32') for key, df in self.extra_dict.items()}
+        # Turn the extras into numpy arrays
+        extras = [ak.to_numpy(df).astype('float32') for df in self.extra_dict.values()]
+
+        # Make cut on events, removing those whose indeces occur in drop_index if there are any
+        if len(drop_index_list):
+            drop_index = np.unique(np.concatenate(drop_index_list))
+            data = np.delete(data, drop_index, axis=0)
+            cat_labels = np.delete(cat_labels, drop_index, axis=0)
+            extras = [np.delete(df, drop_index) for df in extras]
 
         # Now package everything into a list and return
-        data_list = [data, cat_labels] + list(extras.values())
+        data_list = [data, cat_labels] + extras
+
         return data_list
 
     def torch_dataloader(self, **kwargs):
@@ -208,14 +254,35 @@ class DataHandler():
         Returns:
             (tuple): The shape of each sample as a tuple
         """
-        return (self.max_constits, len(self.input_dict))
+
+        if self.max_constits:
+            return (self.max_constits, len(self.input_dict))
+        else:
+            return (len(self.input_dict),)
 
 if __name__ == '__main__':
 
-    # Some simple test code for this class
-    my_branches = ['fjet_sortClusNormByPt_pt', 'fjet_sortClusCenterRotFlip_eta',
-                'fjet_sortClusCenterRot_phi', 'fjet_sortClusNormByPt_e']
-    my_extras = ['fjet_testing_weight_pt', 'fjet_pt']
-    my_handler = DataHandler("../Data/unshuf_test.root", "train", my_branches, 'fjet_signal', extras=my_extras)
+    # Memory optimization code
+    import tracemalloc
+    tracemalloc.start()
 
-    my_handler.plot_branches(my_extras)
+    branches = ['fjet_sortClusNormByPt_pt', 'fjet_sortClusCenterRotFlip_eta',
+                'fjet_sortClusCenterRot_phi', 'fjet_sortClusNormByPt_e']
+    input_file = '/pub/kgreif/samples/sample_nr10k.root'
+
+    dh = DataHandler(input_file, 'train', branches)
+    print(dh.sample_shape())
+
+    current, peak = tracemalloc.get_traced_memory()
+    print("DH build")
+    print(current)
+    print(peak)
+    tracemalloc.reset_peak()
+
+    data_arrs = dh.np_arrays()
+    print(len(data_arrs))
+
+    current, peak = tracemalloc.get_traced_memory()
+    print("NP build")
+    print(current)
+    print(peak)
