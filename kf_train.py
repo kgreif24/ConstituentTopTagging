@@ -174,14 +174,14 @@ if 'dnn' in net_type:
     model = tf.keras.Sequential()
     model.add(tf.keras.Input(shape=(input_shape,)))
     for layer in args.nodes:
-        model.add(tf.keras.layers.Dense(layer, kernel_initializer='he_uniform'))
+        model.add(tf.keras.layers.Dense(layer, kernel_initializer='glorot_normal'))
         # model.add(tf.keras.layers.BatchNormalization(axis=1))
         model.add(tf.keras.layers.ReLU())
-    model.add(tf.keras.layers.Dense(2, kernel_initializer='he_uniform', activation='softmax'))
+    model.add(tf.keras.layers.Dense(2, kernel_initializer='glorot_normal', activation='softmax'))
 
     # Compile model
     model.compile(
-        optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3),
+        optimizer=tf.keras.optimizers.Adam(learning_rate=5e-4),
         loss=tf.keras.losses.CategoricalCrossentropy(from_logits=False),
         metrics=[tf.keras.metrics.CategoricalAccuracy(name='acc')]
     )
@@ -200,7 +200,17 @@ elif net_type == 'efn':
         input_dim=2,
         Phi_sizes=tuple(args.phisizes),
         F_sizes=tuple(args.fsizes),
-        optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3)
+        Phi_acts="relu",
+        F_acts="relu",
+        Phi_k_inits="glorot_normal",
+        F_k_inits="glorot_normal",
+        latent_dropout=0.0,
+        F_dropouts=0.0,
+        mask_val=0,
+        loss="categorical_crossentropy",
+        optimizer=tf.keras.optimizers.Adam(learning_rate=5e-4),
+        output_act='softmax',
+        summary=True
     )
 
 elif net_type == 'pfn':
@@ -210,7 +220,17 @@ elif net_type == 'pfn':
         input_dim=4,
         Phi_sizes=tuple(args.phisizes),
         F_sizes=tuple(args.fsizes),
-        optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3)
+        Phi_acts="relu",
+        F_acts="relu",
+        Phi_k_inits="glorot_normal",
+        F_k_inits="glorot_normal",
+        latent_dropout=0.0,
+        F_dropouts=0.0,
+        mask_val=0,
+        loss="categorical_crossentropy",
+        optimizer=tf.keras.optimizers.Adam(learning_rate=5e-4),
+        output_act="softmax",
+        summary=True
     )
 
 else:
@@ -240,16 +260,16 @@ plt.savefig('./plots/initial_output.png', dpi=300)
 
 # Earlystopping callback
 earlystop_callback = tf.keras.callbacks.EarlyStopping(
-    monitor='val_acc',
+    monitor='val_loss',
     patience=20,
-    mode='max'
+    mode='min'
 )
 
 # Checkpoint callback
 check_callback = tf.keras.callbacks.ModelCheckpoint(
     filepath=checkpoint_filepath,
-    monitor='val_acc',
-    mode='max',
+    monitor='val_loss',
+    mode='min',
     save_best_only=True
 )
 
@@ -323,9 +343,10 @@ wp_p5 = np.argmax(tpr > 0.5)
 wp_p8 = np.argmax(tpr > 0.8)
 
 # Finally print information on model performance
+print("AUC score: ", auc)
+print("ACC score: ", np.max(train_hist.history['val_acc']))
 print("Background rejection at 0.5 signal efficiency: ", fprinv[wp_p5])
 print("Background rejection at 0.8 signal efficiency: ", fprinv[wp_p8])
-print("AUC score: ", auc)
 
 # Make an inverse roc plot. Take 1/fpr and plot this against tpr
 plt.clf()

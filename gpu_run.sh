@@ -5,13 +5,15 @@
 
 # Set up sbatch arguments
 
-#SBATCH --job-name=prtest_pt                      ## Name of the job.
+#SBATCH --job-name=test                           ## Name of the job.
 #SBATCH -A kgreif                                 ## account to charge 
 #SBATCH -p free-gpu                               ## partition/queue name
 #SBATCH --gres=gpu:V100:1                         ## Use only 1 GPU
 #SBATCH --nodes=1                                 ## (-N) number of nodes to use
+#SBATCH --mem=30G                                 ## Request 30G of memory to fit data
+#SBATCH --ntasks-per-node=10
 
-#SBATCH --array=1-5
+#SBATCH --array=1-1
 
 #SBATCH --error=./outfiles/%x_%a.err       ## error log file
 #SBATCH --output=./outfiles/%x_%a.out      ## output file
@@ -43,8 +45,8 @@ echo "In directory ${trdir}"
 ls -lrth
 
 # Next build command to run python training script
-# command="python ${homedir}/kf_train.py --numFolds 5 --fold ${SLURM_ARRAY_TASK_ID} --type efn --phisizes 80 80 --fsizes 80 50 20 --numEpochs 50 --maxConstits 80"
-command="python ${homedir}/pr_train.py --type efn --phisizes 80 80 --fsizes 80 50 25 10 --numEpochs 100"
+command="python ${homedir}/kf_train.py --numFolds 5 --fold ${SLURM_ARRAY_TASK_ID} --type hldnn --nodes 130 130 --numEpochs 5 --maxConstits 0"
+# command="python ${homedir}/pr_train.py --type efn --phisizes 80 80 --fsizes 80 50 25 10 --numEpochs 100"
 # command="python ${homedir}/up_train.py --numFolds 5 --fold ${SLURM_ARRAY_TASK_ID} --type efn --phisizes 80 80 --fsizes 80 50 25 10 --numEpochs 50 --maxConstits 80"
 
 # Run command
