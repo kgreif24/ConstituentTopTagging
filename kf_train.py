@@ -1,11 +1,11 @@
 """ kf_train.py - This script will build, train, and evaluate a network,
 implemented with the keras/energyflow packages. It will make use of the
-DataLoader class to pass to a keras fit function. This will allow data to be
-loaded in 100 MB chunks using uproot's lazy arrays. Also uses the build_model
-function in the models.py file.
+DataLoader class to pass to a keras fit function. This will allow data to
+be loaded into memory batch by batch making use of h5py's array slicing.
+Hopefully this is fast enough data transfer to make training resonably quick.
 
 Author: Kevin Greif
-Last updated 9/22/21
+Last updated 9/30/21
 python3
 """
 
@@ -23,10 +23,10 @@ import colorcet as cc
 import matplotlib
 # Matplotlib import setup to use non-GUI backend, comment for interactive
 # graphics
-# matplotlib.use('Agg')
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-# plt.style.use('~/mattyplotsalot/allpurpose.mplstyle')
-plt.style.use('~/Documents/General Programming/mattyplotsalot/allpurpose.mplstyle')
+plt.style.use('~/mattyplotsalot/allpurpose.mplstyle')
+# plt.style.use('~/Documents/General Programming/mattyplotsalot/allpurpose.mplstyle')
 
 from data_loader import DataLoader
 import models
@@ -65,20 +65,12 @@ args = parser.parse_args()
 ####################### Data Handling ######################
 
 # Data parameters
-# filepath = "/pub/kgreif/samples/sample_4p2M_nbpt.root"
-filepath = "../Data/sample_1p5M_nbpt_test.root"
-
-if 'hl' in args.type:
-    input_branches = ['fjet_Tau1_wta', 'fjet_Tau2_wta', 'fjet_Tau3_wta', 'fjet_Split12',
-                      'fjet_Split23', 'fjet_ECF1', 'fjet_ECF2', 'fjet_ECF3', 'fjet_C2',
-                      'fjet_D2', 'fjet_Qw']
-else:
-    input_branches = ['fjet_sortClusNormByPt_pt', 'fjet_sortClusCenterRotFlip_eta',
-                      'fjet_sortClusCenterRot_phi', 'fjet_sortClusNormByPt_e']
+filepath = "/pub/kgreif/samples/h5dat/sample_4p2M_stan.hdf5"
+# filepath = "../Data/sample_1p5M_nbpt_test.root"
 
 # Now build dhs and use them to plot all branches of interest
 print("Building data objects...")
-dhandler = DataLoader(filepath, "FlatSubstructureJetTree", input_branches)
+dhandler = DataLoader(filepath, batch_size=args.batchSize, net_type=args.type)
 
 ########################## Get Model ########################
 
@@ -144,8 +136,7 @@ plt.title("Loss for model training")
 plt.legend()
 plt.ylabel("Crossentropy loss")
 plt.xlabel("Epoch")
-plt.show()
-# plt.savefig("./plots/loss.png", dpi=300)
+plt.savefig("./plots/loss.png", dpi=300)
 
 # ############################# Evaluate model #################################
 #
