@@ -305,6 +305,26 @@ class DataHandler():
             # For PFNs, we don't need to do anything!
             shaped_data = dataset
 
+        elif net_type == 'resnet':
+
+            # For image based network, we need to bin angular information into 224x224 images
+            # And assign pixel intensity as the sum of pT that fall in that bin
+            # Numpy's histogram2d function does this automatically, but we'll need to make
+            # an event loop
+            shaped_data = np.zeros((dataset.shape[0], 224, 224, 3))
+
+            for i, jet in enumerate(dataset):
+                hist, xbins, ybins = np.histogram2d(dataset[i,:,1], 
+                                                    dataset[i,:,2], 
+                                                    bins=224, 
+                                                    range=[[-np.pi, np,pi], [-np.pi, np,pi]], 
+                                                    weights=dataset[i,:,0])
+                rgb_patch = np.repeat(hist[..., np.newaxis], 3, -1)
+                shaped_data[i,:,:,:] = rgb_patch
+
+        else:
+            raise ValueError("Network type not recognized!")
+
         # Return results
         return shaped_data
 
@@ -343,27 +363,19 @@ class DataHandler():
 
 if __name__ == '__main__':
 
-    # Memory optimization code
-    import tracemalloc
-    tracemalloc.start()
+    # Test jet image generation
+    filepath = "/pub/kgreif/samples/sample_1p5M_nbpt_test.root"
+    input_branches = ['fjet_sortClusNormByPt_pt', 'fjet_sortClusCenterRotFlip_eta',
+                      'fjet_sortClusCenterRot_phi', 'fjet_sortClusNormByPt_e']
+    dhandler = DataHandler(filepath, "FlatSubstructureJetTree", input_branches,
+                           extras=None, max_constits=80)
 
-    branches = ['fjet_sortClusNormByPt_pt', 'fjet_sortClusCenterRotFlip_eta',
-                'fjet_sortClusCenterRot_phi', 'fjet_sortClusNormByPt_e']
-    input_file = '/pub/kgreif/samples/sample_nr10k.root'
+    train_arrs, valid_arrs = dhandler.get_data(
+        net_type='resnet',
+        num_folds=5,
+        fold=0  # -1 to make number into array index
+    )
 
-    dh = DataHandler(input_file, 'train', branches)
-    print(dh.sample_shape())
-
-    current, peak = tracemalloc.get_traced_memory()
-    print("DH build")
-    print(current)
-    print(peak)
-    tracemalloc.reset_peak()
-
-    data_arrs = dh.np_arrays()
-    print(len(data_arrs))
-
-    current, peak = tracemalloc.get_traced_memory()
-    print("NP build")
-    print(current)
-    print(peak)
+    jet_img = train_arrs[0][0,:,:]
+    plt.imshow(jet_img)
+    plt.show()

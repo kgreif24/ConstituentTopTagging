@@ -40,14 +40,21 @@ def build_model(net_type, sample_shape, arglist):
         model = tf.keras.Sequential()
         model.add(tf.keras.Input(shape=(input_shape,)))
         for layer in arglist.nodes:
-            model.add(tf.keras.layers.Dense(layer, kernel_initializer='glorot_normal'))
-            # model.add(tf.keras.layers.BatchNormalization(axis=1))
+            model.add(tf.keras.layers.Dense(layer, 
+                                            kernel_initializer='glorot_uniform', 
+                                            kernel_regularizer=tf.keras.regularizers.l1(l1=1e-3)))
+            if arglist.batchNorm:
+                model.add(tf.keras.layers.BatchNormalization(axis=1))
             model.add(tf.keras.layers.ReLU())
-        model.add(tf.keras.layers.Dense(2, kernel_initializer='glorot_normal', activation='softmax'))
+            model.add(tf.keras.layers.Dropout(arglist.dropout))
+        model.add(tf.keras.layers.Dense(2, 
+                                        kernel_initializer='glorot_uniform', 
+                                        kernel_regularizer=tf.keras.regularizers.l1(l1=1e-3),
+                                        activation='softmax'))
 
         # Compile model
         model.compile(
-            optimizer=tf.keras.optimizers.Adam(learning_rate=5e-4),
+            optimizer=tf.keras.optimizers.Adam(learning_rate=1e-5),
             loss=tf.keras.losses.CategoricalCrossentropy(from_logits=False),
             metrics=[tf.keras.metrics.CategoricalAccuracy(name='acc')]
         )
@@ -92,6 +99,16 @@ def build_model(net_type, sample_shape, arglist):
             output_act="softmax",
             summary=True
         )
+
+    elif net_type == 'resnet':
+        
+        ResNeXt50, preprocess_input = Classifiers.get('resnext50')
+        res_model = ResNeXt50(include_top=False, input_shape=(224, 224, 3), weights=None)
+        model = tf.keras.models.Sequential()
+        model.add(res_model)
+        model.add(tf.keras.layers.GlobalAveragePooling2D(data_format='channels_last'))
+        model.add(tf.keras.layers.Dense(2, activation='softmax'))
+        model.summary()
 
     else:
         raise ValueError("Model type is not known!")

@@ -25,8 +25,7 @@ import matplotlib
 # graphics
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-# plt.style.use('~/mattyplotsalot/allpurpose.mplstyle')
-plt.style.use('~/Documents/General Programming/mattyplotsalot/allpurpose.mplstyle')
+plt.style.use('~/mattyplotsalot/allpurpose.mplstyle')
 
 from data_handler import DataHandler
 import models
@@ -48,6 +47,10 @@ parser.add_argument('--fsizes', default=[], type=int, nargs='*',
                     help='EFN/PFN number of nodes in f layers')
 parser.add_argument('--phisizes', default=[], type=int, nargs='*',
                     help='EFN/PFN number of nodes in phi layers')
+parser.add_argument('--batchNorm', action='store_true', default=False,
+                    help='If present, use batch norm in DNN based models')
+parser.add_argument('--dropout', default=0., type=float,
+                    help='The dropout rate to use in DNN layers and in EFN/PFN F network')
 parser.add_argument('-N', '--numEpochs', default=100, type=int,
                     help='Number of epochs')
 parser.add_argument('-b', '--batchSize', default=100, type=int,
@@ -65,8 +68,7 @@ args = parser.parse_args()
 ####################### Data Handling ######################
 
 # Data parameters
-# filepath = "/pub/kgreif/samples/sample_4p2M_nbpt.root"
-filepath = "../Data/sample_1p5M_nbpt_test.root"
+filepath = "/pub/kgreif/samples/sample_4p2M_nbpt.root"
 
 if 'hl' in args.type:
     input_branches = ['fjet_Tau1_wta', 'fjet_Tau2_wta', 'fjet_Tau3_wta', 'fjet_Split12',
@@ -125,7 +127,7 @@ plt.savefig('./plots/initial_output.png', dpi=300)
 # Earlystopping callback
 earlystop_callback = tf.keras.callbacks.EarlyStopping(
     monitor='val_loss',
-    patience=20,
+    patience=50,
     mode='min'
 )
 
