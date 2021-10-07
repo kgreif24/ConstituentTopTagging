@@ -66,6 +66,9 @@ for batch in events.iterate(step_size='1 GB', filter_name=all_branches):
         b_zero = ak.pad_none(branch, args.numConstits, axis=1, clip=True)
         b_zero = ak.fill_none(b_zero, 0)
 
+        # Preprocessing can introdcue NaNs, set these to 0 here
+        np.nan_to_num(b_zero, copy=False)
+
         # Write b_zero to hdf5 file
         constits[start_index:end_index,:,i] = b_zero
 
