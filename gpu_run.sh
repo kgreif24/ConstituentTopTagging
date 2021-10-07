@@ -45,7 +45,7 @@ echo "In directory ${trdir}"
 ls -lrth
 
 # Next build command to run python training script
-command="python ${homedir}/kf_train.py --type dnn --nodes 50 50 --numEpochs 5"
+command="python ${homedir}/kf_train.py --type resnet --numEpochs 5"
 # command="python ${homedir}/pr_train.py --type efn --phisizes 80 80 --fsizes 80 50 25 10 --numEpochs 100"
 # command="python ${homedir}/up_train.py --numFolds 5 --fold ${SLURM_ARRAY_TASK_ID} --type efn --phisizes 80 80 --fsizes 80 50 25 10 --numEpochs 50 --maxConstits 80"
 

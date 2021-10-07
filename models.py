@@ -9,6 +9,7 @@ Last updated 9/14/21
 
 import energyflow as ef
 from energyflow.archs import EFN
+from classification_models.tfkeras import Classifiers
 import tensorflow as tf
 import sklearn.metrics as metrics
 import numpy as np
@@ -92,6 +93,16 @@ def build_model(net_type, sample_shape, arglist):
             output_act="softmax",
             summary=True
         )
+
+    elif net_type == 'resnet':
+        
+        ResNeXt50, preprocess_input = Classifiers.get('resnext50')
+        res_model = ResNeXt50(include_top=False, input_shape=(224, 224, 3), weights=None)
+        model = tf.keras.models.Sequential()
+        model.add(res_model)
+        model.add(tf.keras.layers.GlobalAveragePooling2D(data_format='channels_last'))
+        model.add(tf.keras.layers.Dense(2, activation='softmax'))
+        model.summary()
 
     else:
         raise ValueError("Model type is not known!")

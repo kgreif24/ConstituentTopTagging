@@ -5,12 +5,18 @@ This will allow us to loop over an entire training dataset while only ever
 having a fraction of it loaded in memory (important for training image based
 tagger).
 
+In the future, look into chunked memory to further optimize training speed.
+
 As of now the number of constituents is set in to_hdf.py step. Could make 
 this into a keyword argument here if we ever want to vary number constituents.
 
+Further, shuffling is currently done by keras' fit function at batch level, 
+so jets within a batch will always stay the same. Could look at doing more
+fancy shuffling later if needed.
+
 Author: Kevin Greif
 python3
-Last updated 9/30/21
+Last updated 10/4/21
 """
 
 import h5py
@@ -26,8 +32,8 @@ class DataLoader(Sequence):
     class.
     """
 
-    def __init__(self, file_path, batch_size=100, to_fit=True, shuffle=True,
-                 net_type='dnn'):
+    def __init__(self, file_path, batch_size=100, valid=False, shuffle=True,
+                 net_type='dnn', num_folds=5, this_fold=1):
         """ __init__ - Init function for this class. Will load in root file
         using uproot. As Sequence class has no specific init function, don't
         need to worry about calling super().
@@ -36,9 +42,11 @@ class DataLoader(Sequence):
             file_path (string): Path to h5py file containing TTree
             batch_size (int): The number of jets in each batch, used to
             calculate length of the loader
-            to_fit (bool): If true, include labels in batch
+            valid (bool): If true, feed validation partition and not training
             shuffle (bool): If true, shuffle jets before each epoch
             net_type (string): Specifies the model specific data preparation to use
+            num_folds (int): The number of folds data is split into
+            this_fold (int): The number of the fold to use, 1-num_folds
 
         Returns:
             None
@@ -47,26 +55,49 @@ class DataLoader(Sequence):
         # First we set some instance variables for later use
         self.max_constits = 80 # Hardcoded for now, see file doc string
         self.batch_size = batch_size
-        self.to_fit = to_fit
+        self.valid = valid
         self.shuffle = shuffle
         self.net_type = net_type
 
         # Load hdf5 file using h5py, braches will be loaded in get item function
         self.file = h5py.File(file_path, 'r')
 
-        # Once we have lazy arrays loaded, we can pull the number of events
+        # Once we have file loaded, we can pull the number of events
         # Use the weights array since it is just a vector with length equal to
         # the number of events
-        self.num_events = len(self.file['weights'])
+        tot_events = len(self.file['weights'])
 
-        # Now we need to find the sample shape, refactor this!
-        self.sample_shape = (self.max_constits, 4)
+        # Now we need to find the sample shape, depends on net_type
+        if 'hl' in self.net_type:
+            self.sample_shape = (self.file['hl'].shape[1],)
+        else:
+            self.sample_shape = (self.max_constits, 4)
 
+        # Decide train/valid split for the given fold. Generator will only
+        # return data from one of these partitions, depending on the to_fit flag.
+        indeces = np.arange(0, tot_events, 1)
+        folds = np.array_split(indeces, num_folds)
+        valid_indeces = folds.pop(this_fold - 1)  # -1 to make this_fold an index
+        train_indeces = np.concatenate(folds)
+
+        # Instead of using these indeces for indexing h5py file every time (slow)
+        # lets only do this on the "seam" batch. Find location of seam in train_indeces
+        self.seam = valid_indeces[0]
+
+        # Now choose number of events and indeces based on whether we are doing
+        # training or validation
+        if not self.valid:
+            self.indeces = train_indeces
+            self.num_events = len(train_indeces)
+        else:
+            self.indeces = valid_indeces
+            self.num_events = len(valid_indeces)
+            
 
     def __len__(self):
         """ __len__ - This function returns the number of batches in each epoch
-        given the size of the data and the batch size. We will drop remainder
-        of data for now.
+        given the size of the data and the batch size. Use remainder of data as 
+        partial batch.
 
         Arguments:
             None
@@ -74,7 +105,7 @@ class DataLoader(Sequence):
         Returns:
             (int) - Number of batches in each epoch
         """
-        return int(np.floor(self.num_events / self.batch_size))
+        return int(np.ceil(self.num_events / self.batch_size))
 
 
     def __getitem__(self, index):
@@ -95,8 +126,48 @@ class DataLoader(Sequence):
         start = index * self.batch_size
         stop = (index + 1) * self.batch_size
 
-        # Then pull just the data into memory
-        batch_data = self.file['constits'][start:stop]
+        # Correct indexing if this is the last batch
+        this_bs = self.batch_size
+        if stop > self.num_events:
+            stop = self.num_events
+            this_bs = stop - start
+
+        # Now we decide what kind of data we want to pull (hl or constit)
+        if 'hl' in self.net_type:
+            data_key = 'hl'
+        else:
+            data_key = 'constits'
+
+        # We watch to use different indexing for the "seam" batch and all other batches
+        # Condition on this here. Note this will never happen for validation sequences
+        # since self.seam is the index of the first element in the train_indeces that "jumps"
+        # over validation data. This is either 0 or some number larger than the length of
+        # the validation sequence.
+        if start < self.seam and stop > self.seam:
+
+            # Given this is true, we just index using a slice of the numpy array
+            batch_indeces = self.indeces[start:stop]
+            batch_data = self.file[data_key][batch_indeces]
+
+            # We also need to load labels and weights, since this conditional will only
+            # occur if we are training
+            assert not self.valid
+            batch_labels = self.file['labels'][batch_indeces,:]
+            batch_weights = self.file['weights'][batch_indeces]
+
+        else:
+
+            # If this batch doesn't sit on the seam, pull actual start/stop from numpy array
+            batch_start = self.indeces[start]
+            # Unfortunately finding stop index is rather complicated. We want to reference at stop-1
+            # since stop is one more than an index. However we want to add 1 to the number at stop-1
+            # as this number needs to be turned into the second number in a slice. What a mess.
+            batch_stop = self.indeces[stop-1] + 1
+            batch_data = self.file[data_key][batch_start:batch_stop]
+
+            # Now load labels and weights the regular way
+            batch_labels = self.file['labels'][batch_start:batch_stop,:]
+            batch_weights = self.file['weights'][batch_start:batch_stop]
 
         # Now we have model dependent reshapes
         if 'dnn' in self.net_type:
@@ -105,31 +176,39 @@ class DataLoader(Sequence):
             input_shape = np.prod(self.sample_shape)
 
             # Now we do reshaping
-            shaped_data = batch_data.reshape((self.batch_size, input_shape))
+            shaped_data = batch_data.reshape((this_bs, input_shape))
 
         elif self.net_type == 'efn':
 
             # For EFNs, we need to split pT and angular information
             shaped_data = [batch_data[:,:,0], batch_data[:,:,1:3]]
 
-        elif net_type == 'pfn':
+        elif self.net_type == 'pfn':
 
             # For PFNs, we don't need to do anything!
             shaped_data = batch_data
 
+        elif self.net_type == 'resnet':
+
+            # For image based network, we need to bin angular information into 224x224 images
+            # And assign pixel intensity as the sum of pT that fall in that bin
+            # Numpy's histogram2d function does this automatically, but we'll need to make
+            # an event loop
+            shaped_data = np.zeros((this_bs, 224, 224, 3))
+
+            for i, jet in enumerate(batch_data):
+
+                hist, xbins, ybins = np.histogram2d(batch_data[i,:,1],
+                                                    batch_data[i,:,2],
+                                                    bins=224,
+                                                    range=[[-np.pi,np.pi],[-np.pi,np.pi]],
+                                                    weights=batch_data[i,:,0])
+                rgb_patch = np.repeat(hist[..., np.newaxis], 3, -1)
+                shaped_data[i,:,:,:] = rgb_patch
+
 
         # Finally package everything into a tuple and return
-        if self.to_fit:
-            # If we are fitting, also load labels and weights
-            batch_labels = self.file['labels'][start:stop,:]
-            batch_weights = self.file['weights'][start:stop]
-
-            # Finally return
-            return shaped_data, batch_labels, batch_weights
-
-        else:
-            # If we are not fitting, just return the data
-            return shaped_data
+        return shaped_data, batch_labels, batch_weights
 
 
 if __name__ == '__main__':

@@ -5,12 +5,11 @@ be loaded into memory batch by batch making use of h5py's array slicing.
 Hopefully this is fast enough data transfer to make training resonably quick.
 
 Author: Kevin Greif
-Last updated 9/30/21
+Last updated 10/4/21
 python3
 """
 
 import sys, os
-import gc
 import argparse
 
 import energyflow as ef
@@ -65,35 +64,39 @@ args = parser.parse_args()
 ####################### Data Handling ######################
 
 # Data parameters
-filepath = "/pub/kgreif/samples/h5dat/sample_4p2M_stan.hdf5"
+# filepath = "/pub/kgreif/samples/h5dat/sample_4p2M_stan.hdf5"
 # filepath = "../Data/sample_1p5M_nbpt_test.root"
+filepath = "/data1/kgreif/sample_1p5M_stan_test.hdf5"
 
 # Now build dhs and use them to plot all branches of interest
 print("Building data objects...")
-dhandler = DataLoader(filepath, batch_size=args.batchSize, net_type=args.type)
+dtrain = DataLoader(filepath, batch_size=args.batchSize, net_type=args.type, num_folds=5, this_fold=2)
+dvalid = DataLoader(filepath, batch_size=args.batchSize, net_type=args.type, num_folds=5, this_fold=2, valid=True)
 
 ########################## Get Model ########################
 
-model = models.build_model(args.type, dhandler.sample_shape, args)
+model = models.build_model(args.type, dtrain.sample_shape, args)
 
-# ##################### Initial Evaluation ####################
-#
-# print("\nPre-train evaluation...")
-# preds = model.predict(valid_arrs[0], batch_size=args.batchSize)
-#
-# # Make a histogram of network output, separated into signal/background
-# preds_sig = preds[valid_arrs[1][:,1] == 1]
-# preds_bkg = preds[valid_arrs[1][:,1] == 0]
-# hist_bins = np.linspace(0, 1.0, 100)
-#
-# plt.clf()
-# plt.hist(preds_sig[:,1], bins=hist_bins, alpha=0.5, label='Signal')
-# plt.hist(preds_bkg[:,1], bins=hist_bins, alpha=0.5, label='Background')
-# plt.legend()
-# plt.ylabel("Counts")
-# plt.xlabel("Model output")
-# plt.title("Model output over validation set")
-# plt.savefig('./plots/initial_output.png', dpi=300)
+##################### Initial Evaluation ####################
+
+print("\nPre-train evaluation...")
+preds = model.predict(dvalid, batch_size=args.batchSize, verbose=1)
+
+# Make a histogram of network output, separated into signal/background
+labels_vec = dvalid.file['labels'][dvalid.indeces,1]
+preds_sig = preds[labels_vec == 1]
+preds_bkg = preds[labels_vec == 0]
+hist_bins = np.linspace(0, 1.0, 100)
+
+plt.clf()
+plt.hist(preds_sig[:,1], bins=hist_bins, alpha=0.5, label='Signal')
+plt.hist(preds_bkg[:,1], bins=hist_bins, alpha=0.5, label='Background')
+plt.legend()
+plt.ylabel("Counts")
+plt.xlabel("Model output")
+plt.title("Model output over validation set")
+plt.savefig('./plots/initial_output.png', dpi=300
+)
 
 ############################### Train model #################################
 
@@ -121,9 +124,10 @@ tboard_callback = tf.keras.callbacks.TensorBoard(
 # Train model by calling fit
 print("\nTraining model...")
 train_hist = model.fit(
-    dhandler,
+    dtrain,
     epochs=args.numEpochs,
     batch_size=args.batchSize,
+    validation_data=dvalid,
     callbacks=[earlystop_callback, check_callback, tboard_callback],
     verbose=1
 )
@@ -138,50 +142,50 @@ plt.ylabel("Crossentropy loss")
 plt.xlabel("Epoch")
 plt.savefig("./plots/loss.png", dpi=300)
 
-# ############################# Evaluate model #################################
-#
-# # Get predictions on validation data
-# print("\nEvaluate best model...")
-#
-# # First load best checkpoint
-# model = tf.keras.models.load_model(args.checkDir)
-#
-# # Predict
-# preds = model.predict(valid_arrs[0], batch_size=args.batchSize)
-#
-# # Make a histogram of network output, separated into signal/background
-# preds_sig = preds[valid_arrs[1][:,1] == 1,:]
-# preds_bkg = preds[valid_arrs[1][:,1] == 0,:]
-# hist_bins = np.linspace(0, 1.0, 100)
-#
-# plt.clf()
-# plt.hist(preds_sig[:,1], bins=hist_bins, alpha=0.5, label='Signal')
-# plt.hist(preds_bkg[:,1], bins=hist_bins, alpha=0.5, label='Background')
-# plt.legend()
-# plt.ylabel("Counts")
-# plt.xlabel("Model output")
-# plt.title("Model output over validation set")
-# plt.savefig("./plots/final_output.png", dpi=300)
-#
-# # Get ROC curve and AUC
-# fpr, tpr, thresholds = metrics.roc_curve(valid_arrs[1][:,1], preds[:,1])
-# auc = metrics.roc_auc_score(valid_arrs[1][:,1], preds[:,1])
-# fprinv = 1 / fpr
-#
-# # Find background rejection at tpr = 0.5, 0.8 working points
-# wp_p5 = np.argmax(tpr > 0.5)
-# wp_p8 = np.argmax(tpr > 0.8)
-#
-# # Finally print information on model performance
-# print("AUC score: ", auc)
-# print("ACC score: ", np.max(train_hist.history['val_acc']))
-# print("Background rejection at 0.5 signal efficiency: ", fprinv[wp_p5])
-# print("Background rejection at 0.8 signal efficiency: ", fprinv[wp_p8])
-#
-# # Make an inverse roc plot. Take 1/fpr and plot this against tpr
-# plt.clf()
-# plt.plot(tpr, fprinv)
-# plt.yscale('log')
-# plt.ylabel('Background rejection')
-# plt.xlabel('Signal efficiency')
-# plt.savefig("./plots/roc.png", dpi=300)
+############################# Evaluate model #################################
+
+# Get predictions on validation data
+print("\nEvaluate best model...")
+
+# First load best checkpoint
+model = tf.keras.models.load_model(args.checkDir)
+
+# Predict
+preds = model.predict(dvalid, batch_size=args.batchSize)
+
+# Make a histogram of network output, separated into signal/background
+preds_sig = preds[labels_vec == 1,:]
+preds_bkg = preds[labels_vec == 0,:]
+hist_bins = np.linspace(0, 1.0, 100)
+
+plt.clf()
+plt.hist(preds_sig[:,1], bins=hist_bins, alpha=0.5, label='Signal')
+plt.hist(preds_bkg[:,1], bins=hist_bins, alpha=0.5, label='Background')
+plt.legend()
+plt.ylabel("Counts")
+plt.xlabel("Model output")
+plt.title("Model output over validation set")
+plt.savefig("./plots/final_output.png", dpi=300)
+
+# Get ROC curve and AUC
+fpr, tpr, thresholds = metrics.roc_curve(labels_vec, preds[:,1])
+auc = metrics.roc_auc_score(labels_vec, preds[:,1])
+fprinv = 1 / fpr
+
+# Find background rejection at tpr = 0.5, 0.8 working points
+wp_p5 = np.argmax(tpr > 0.5)
+wp_p8 = np.argmax(tpr > 0.8)
+
+# Finally print information on model performance
+print("AUC score: ", auc)
+print("ACC score: ", np.max(train_hist.history['val_acc']))
+print("Background rejection at 0.5 signal efficiency: ", fprinv[wp_p5])
+print("Background rejection at 0.8 signal efficiency: ", fprinv[wp_p8])
+
+# Make an inverse roc plot. Take 1/fpr and plot this against tpr
+plt.clf()
+plt.plot(tpr, fprinv)
+plt.yscale('log')
+plt.ylabel('Background rejection')
+plt.xlabel('Signal efficiency')
+plt.savefig("./plots/roc.png", dpi=300)
