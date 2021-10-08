@@ -9,6 +9,7 @@ Last updated 9/14/21
 
 import energyflow as ef
 from energyflow.archs import EFN
+from classification_models.tfkeras import Classifiers
 import tensorflow as tf
 import sklearn.metrics as metrics
 import numpy as np
@@ -108,6 +109,14 @@ def build_model(net_type, sample_shape, arglist):
         model.add(res_model)
         model.add(tf.keras.layers.GlobalAveragePooling2D(data_format='channels_last'))
         model.add(tf.keras.layers.Dense(2, activation='softmax'))
+
+        # Compile model
+        model.compile(
+            optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3),
+            loss=tf.keras.losses.CategoricalCrossentropy(from_logits=False),
+            metrics=[tf.keras.metrics.CategoricalAccuracy(name='acc')]
+        )
+        
         model.summary()
 
     else:
