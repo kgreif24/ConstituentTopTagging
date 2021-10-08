@@ -6,7 +6,7 @@ by indeces (except for lazy arrays, but these are very slow).
 
 Author: Kevin Greif
 python3
-Last updated 9/27/21
+Last updated 10/7/21
 """
 
 import h5py
@@ -43,6 +43,7 @@ num_events = len(events[signal_branch[0]].array())
 # Now we build hdf5 file
 f = h5py.File(args.name, 'w')
 constits = f.create_dataset("constits", (num_events, args.numConstits, len(constit_branches)), dtype='f4')
+images = f.create_dataset("images", (num_events, args.numConstits, 2), dtype='i4')
 hl = f.create_dataset("hl", (num_events, len(hl_branches)), dtype='f4')
 weights = f.create_dataset("weights", (num_events,), dtype='f4')
 labels = f.create_dataset("labels", (num_events, 2), dtype='i4')
@@ -64,13 +65,20 @@ for batch in events.iterate(step_size='1 GB', filter_name=all_branches):
         # Zero pad data
         branch = batch[branch_name]
         b_zero = ak.pad_none(branch, args.numConstits, axis=1, clip=True)
-        b_zero = ak.fill_none(b_zero, 0)
+        b_zero = ak.to_numpy(ak.fill_none(b_zero, 0))
 
         # Preprocessing can introdcue NaNs, set these to 0 here
         np.nan_to_num(b_zero, copy=False)
+        assert not np.isnan(b_zero).any()
 
         # Write b_zero to hdf5 file
         constits[start_index:end_index,:,i] = b_zero
+
+        # Now use np.digitize to find histogram bins for eta/phi
+        if (i == 1 or i == 2):
+            bins = np.arange(-np.pi, np.pi, 224)
+            binned_branch = np.digitize(b_zero, bins)
+            images[start_index:end_index,:,i-1] = binned_branch
 
     # Now deal with hl variables, assuming -999 exit codes have been dealt with
     # in data slim step, along with standardization
