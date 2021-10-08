@@ -65,7 +65,7 @@ for batch in events.iterate(step_size='1 GB', filter_name=all_branches):
         # Zero pad data
         branch = batch[branch_name]
         b_zero = ak.pad_none(branch, args.numConstits, axis=1, clip=True)
-        b_zero = ak.to_numpy(ak.fill_none(b_zero, 0))
+        b_zero = ak.to_numpy(ak.fill_none(b_zero, 0, axis=None))
 
         # Preprocessing can introdcue NaNs, set these to 0 here
         np.nan_to_num(b_zero, copy=False)
@@ -76,7 +76,7 @@ for batch in events.iterate(step_size='1 GB', filter_name=all_branches):
 
         # Now use np.digitize to find histogram bins for eta/phi
         if (i == 1 or i == 2):
-            bins = np.arange(-np.pi, np.pi, 224)
+            bins = np.linspace(-np.pi, np.pi, 224)
             binned_branch = np.digitize(b_zero, bins)
             images[start_index:end_index,:,i-1] = binned_branch
 
