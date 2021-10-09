@@ -28,6 +28,7 @@ plt.style.use('~/mattyplotsalot/allpurpose.mplstyle')
 # plt.style.use('~/Documents/General Programming/mattyplotsalot/allpurpose.mplstyle')
 
 from data_loader import DataLoader
+from data_loader import FakeLoader
 import models
 
 
@@ -66,7 +67,7 @@ args = parser.parse_args()
 # Data parameters
 # filepath = "/pub/kgreif/samples/h5dat/sample_4p2M_stan.hdf5"
 # filepath = "../Data/sample_1p5M_nbpt_test.root"
-filepath = "/data1/kgreif/sample_1p5M_stan_test.hdf5"
+filepath = "/data1/kgreif/sample_4p2M_stan.hdf5"
 
 # Now build dhs and use them to plot all branches of interest
 print("Building data objects...")
@@ -77,7 +78,7 @@ dvalid = DataLoader(filepath, batch_size=args.batchSize, net_type=args.type, num
 
 model = models.build_model(args.type, dtrain.sample_shape, args)
 
-##################### Initial Evaluation ####################
+# ##################### Initial Evaluation ####################
 
 print("\nPre-train evaluation...")
 preds = model.predict(dvalid, batch_size=args.batchSize, verbose=1)

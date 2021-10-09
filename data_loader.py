@@ -184,16 +184,11 @@ class DataLoader(Sequence):
         # Now we have model dependent reshapes
         if 'dnn' in self.net_type:
 
-            time_start = time.time()
-
             # Input shape for all dnn networks can be found from sample shape
             input_shape = np.prod(self.sample_shape)
 
             # Now we do reshaping
             shaped_data = batch_data.reshape((this_bs, input_shape))
-
-            time_stop = time.time()
-            print("Reshape time:", time_stop - time_start)
 
         elif self.net_type == 'efn':
 
@@ -207,8 +202,6 @@ class DataLoader(Sequence):
 
         elif self.net_type == 'resnet':
 
-            time_start = time.time()
-
             # For image based network, our data is a list of indeces. Will also
             # need jet i.d. information for indexing pixels
             jet_id = np.repeat(np.arange(0, this_bs, 1), self.max_constits, axis=0)
@@ -217,18 +210,12 @@ class DataLoader(Sequence):
             jet_index = np.ravel(jet_id)
             eta_index = np.ravel(batch_data[:,:,0])
             phi_index = np.ravel(batch_data[:,:,1])
-            cons_pt = np.ravel(batch_pt)
-
-            # We want to expand pt information into 3 channels before building images
-            # (this makes for much less data for us to copy)
-            expanded_pt = np.repeat(np.expand_dims(cons_pt, axis=-1), 3, axis=-1)
+            # Expand dims on pt because we have channels dimension
+            cons_pt = np.expand_dims(np.ravel(batch_pt), axis=-1)
 
             # Build images, starting from a zero array and incrementing
-            shaped_data = np.zeros((this_bs, 224, 224, 3), dtype=np.float32)
-            shaped_data[jet_index, eta_index, phi_index,:] += expanded_pt
-
-            time_stop = time.time()
-            print("Reshape time:", time_stop - time_start)
+            shaped_data = np.zeros((this_bs, 224, 224, 1), dtype=np.float32)
+            shaped_data[jet_index, eta_index, phi_index, :] += cons_pt
             
         # Finally package everything into a tuple and return
         return shaped_data, batch_labels, batch_weights
@@ -244,7 +231,7 @@ class FakeLoader(Sequence):
     def __getitem__(self, index):
         labels_vec = np.ones(100, dtype=np.int8)
         labels_cat = np.eye(2, dtype=np.float32)[labels_vec]
-        return (np.random.rand(100, 224, 224, 3), labels_cat)
+        return (np.random.rand(100, 224, 224, 1), labels_cat)
 
 
 if __name__ == '__main__':
