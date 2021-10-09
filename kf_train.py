@@ -65,9 +65,9 @@ args = parser.parse_args()
 ####################### Data Handling ######################
 
 # Data parameters
-# filepath = "/pub/kgreif/samples/h5dat/sample_4p2M_stan.hdf5"
+filepath = "/pub/kgreif/samples/h5dat/sample_4p2M_stan.hdf5"
 # filepath = "../Data/sample_1p5M_nbpt_test.root"
-filepath = "/data1/kgreif/sample_4p2M_stan.hdf5"
+# filepath = "/data1/kgreif/sample_4p2M_stan.hdf5"
 
 # Now build dhs and use them to plot all branches of interest
 print("Building data objects...")
@@ -78,26 +78,26 @@ dvalid = DataLoader(filepath, batch_size=args.batchSize, net_type=args.type, num
 
 model = models.build_model(args.type, dtrain.sample_shape, args)
 
-# ##################### Initial Evaluation ####################
+# # ##################### Initial Evaluation ####################
 
-print("\nPre-train evaluation...")
-preds = model.predict(dvalid, batch_size=args.batchSize, verbose=1)
+# print("\nPre-train evaluation...")
+# preds = model.predict(dvalid, batch_size=args.batchSize, verbose=1)
 
-# Make a histogram of network output, separated into signal/background
-labels_vec = dvalid.file['labels'][dvalid.indeces,1]
-preds_sig = preds[labels_vec == 1]
-preds_bkg = preds[labels_vec == 0]
-hist_bins = np.linspace(0, 1.0, 100)
+# # Make a histogram of network output, separated into signal/background
+# labels_vec = dvalid.file['labels'][dvalid.indeces,1]
+# preds_sig = preds[labels_vec == 1]
+# preds_bkg = preds[labels_vec == 0]
+# hist_bins = np.linspace(0, 1.0, 100)
 
-plt.clf()
-plt.hist(preds_sig[:,1], bins=hist_bins, alpha=0.5, label='Signal')
-plt.hist(preds_bkg[:,1], bins=hist_bins, alpha=0.5, label='Background')
-plt.legend()
-plt.ylabel("Counts")
-plt.xlabel("Model output")
-plt.title("Model output over validation set")
-plt.savefig('./plots/initial_output.png', dpi=300
-)
+# plt.clf()
+# plt.hist(preds_sig[:,1], bins=hist_bins, alpha=0.5, label='Signal')
+# plt.hist(preds_bkg[:,1], bins=hist_bins, alpha=0.5, label='Background')
+# plt.legend()
+# plt.ylabel("Counts")
+# plt.xlabel("Model output")
+# plt.title("Model output over validation set")
+# plt.savefig('./plots/initial_output.png', dpi=300
+# )
 
 ############################### Train model #################################
 

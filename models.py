@@ -102,7 +102,8 @@ def build_model(net_type, sample_shape, arglist):
         resnext = ResNeXt50(input_tensor=input_tens, include_top=False, weights=None,
                             backend=tf.keras.backend, layers=tf.keras.layers, models=tf.keras.models,
                             utils=tf.keras.utils)
-        top_layer = tf.keras.layers.Dense(2, activation='softmax')(resnext.output)
+        max_pool = tf.keras.layers.GlobalAveragePooling2D(data_format='channels_last')(resnext.output)
+        top_layer = tf.keras.layers.Dense(2, activation='softmax')(max_pool)
         model = tf.keras.models.Model(inputs=input_tens, outputs=top_layer)
 
         # Compile model
