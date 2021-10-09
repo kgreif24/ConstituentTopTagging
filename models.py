@@ -102,6 +102,13 @@ def build_model(net_type, sample_shape, arglist):
         model.add(res_model)
         model.add(tf.keras.layers.GlobalAveragePooling2D(data_format='channels_last'))
         model.add(tf.keras.layers.Dense(2, activation='softmax'))
+
+        # Compile model
+        model.compile(
+            optimizer=tf.keras.optimizers.Adam(learning_rate=5e-4),
+            loss=tf.keras.losses.CategoricalCrossentropy(from_logits=False),
+            metrics=[tf.keras.metrics.CategoricalAccuracy(name='acc')]
+        )
         model.summary()
 
     else:

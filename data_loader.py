@@ -25,6 +25,8 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras.utils import Sequence
 
+import time
+
 
 class DataLoader(Sequence):
     """ DataLoader - The role of this class is to build a keras data generator
@@ -135,6 +137,8 @@ class DataLoader(Sequence):
         # Now we decide what kind of data we want to pull (hl or constit)
         if 'hl' in self.net_type:
             data_key = 'hl'
+        elif self.net_type == 'resnet':
+            data_key = 'images'
         else:
             data_key = 'constits'
 
@@ -148,6 +152,10 @@ class DataLoader(Sequence):
             # Given this is true, we just index using a slice of the numpy array
             batch_indeces = self.indeces[start:stop]
             batch_data = self.file[data_key][batch_indeces]
+
+            # Resnet needs pt data for pixel intensity
+            if self.net_type == 'resnet':
+                batch_pt = self.file['constits'][batch_indeces,:,0]
 
             # We also need to load labels and weights, since this conditional will only
             # occur if we are training
@@ -165,6 +173,10 @@ class DataLoader(Sequence):
             batch_stop = self.indeces[stop-1] + 1
             batch_data = self.file[data_key][batch_start:batch_stop]
 
+            # Again, resnet needs pt data for pixel intensity
+            if self.net_type == 'resnet':
+                batch_pt = self.file['constits'][batch_start:batch_stop,:,0]
+
             # Now load labels and weights the regular way
             batch_labels = self.file['labels'][batch_start:batch_stop,:]
             batch_weights = self.file['weights'][batch_start:batch_stop]
@@ -172,11 +184,16 @@ class DataLoader(Sequence):
         # Now we have model dependent reshapes
         if 'dnn' in self.net_type:
 
+            time_start = time.time()
+
             # Input shape for all dnn networks can be found from sample shape
             input_shape = np.prod(self.sample_shape)
 
             # Now we do reshaping
             shaped_data = batch_data.reshape((this_bs, input_shape))
+
+            time_stop = time.time()
+            print("Reshape time:", time_stop - time_start)
 
         elif self.net_type == 'efn':
 
@@ -190,25 +207,44 @@ class DataLoader(Sequence):
 
         elif self.net_type == 'resnet':
 
-            # For image based network, we need to bin angular information into 224x224 images
-            # And assign pixel intensity as the sum of pT that fall in that bin
-            # Numpy's histogram2d function does this automatically, but we'll need to make
-            # an event loop
-            shaped_data = np.zeros((this_bs, 224, 224, 3))
+            time_start = time.time()
 
-            for i, jet in enumerate(batch_data):
+            # For image based network, our data is a list of indeces. Will also
+            # need jet i.d. information for indexing pixels
+            jet_id = np.repeat(np.arange(0, this_bs, 1), self.max_constits, axis=0)
 
-                hist, xbins, ybins = np.histogram2d(batch_data[i,:,1],
-                                                    batch_data[i,:,2],
-                                                    bins=224,
-                                                    range=[[-np.pi,np.pi],[-np.pi,np.pi]],
-                                                    weights=batch_data[i,:,0])
-                rgb_patch = np.repeat(hist[..., np.newaxis], 3, -1)
-                shaped_data[i,:,:,:] = rgb_patch
+            # Now flatten all index arrays and pt array
+            jet_index = np.ravel(jet_id)
+            eta_index = np.ravel(batch_data[:,:,0])
+            phi_index = np.ravel(batch_data[:,:,1])
+            cons_pt = np.ravel(batch_pt)
 
+            # We want to expand pt information into 3 channels before building images
+            # (this makes for much less data for us to copy)
+            expanded_pt = np.repeat(np.expand_dims(cons_pt, axis=-1), 3, axis=-1)
 
+            # Build images, starting from a zero array and incrementing
+            shaped_data = np.zeros((this_bs, 224, 224, 3), dtype=np.float32)
+            shaped_data[jet_index, eta_index, phi_index,:] += expanded_pt
+
+            time_stop = time.time()
+            print("Reshape time:", time_stop - time_start)
+            
         # Finally package everything into a tuple and return
         return shaped_data, batch_labels, batch_weights
+
+class FakeLoader(Sequence):
+
+    def __init__(self):
+        self.sample_shape = (80, 4)
+
+    def __len__(self):
+        return 33600
+
+    def __getitem__(self, index):
+        labels_vec = np.ones(100, dtype=np.int8)
+        labels_cat = np.eye(2, dtype=np.float32)[labels_vec]
+        return (np.random.rand(100, 224, 224, 3), labels_cat)
 
 
 if __name__ == '__main__':
