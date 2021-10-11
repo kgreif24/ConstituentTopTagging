@@ -74,10 +74,10 @@ def build_model(net_type, sample_shape, arglist):
             Phi_k_inits="glorot_normal",
             F_k_inits="glorot_normal",
             latent_dropout=0.0,
-            F_dropouts=0.0,
+            F_dropouts=arglist.dropout,
             mask_val=0,
             loss="categorical_crossentropy",
-            optimizer=tf.keras.optimizers.Adam(learning_rate=5e-4),
+            optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4),
             output_act='softmax',
             summary=True
         )
@@ -93,10 +93,10 @@ def build_model(net_type, sample_shape, arglist):
             Phi_k_inits="glorot_normal",
             F_k_inits="glorot_normal",
             latent_dropout=0.0,
-            F_dropouts=0.0,
+            F_dropouts=arglist.dropout,
             mask_val=0,
             loss="categorical_crossentropy",
-            optimizer=tf.keras.optimizers.Adam(learning_rate=5e-4),
+            optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4),
             output_act="softmax",
             summary=True
         )
