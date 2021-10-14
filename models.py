@@ -4,7 +4,7 @@ used with kf_train.py script.
 
 Author: Kevin Greif
 python3
-Last updated 9/14/21
+Last updated 10/13/21
 """
 
 import energyflow as ef
@@ -41,17 +41,21 @@ def build_model(net_type, sample_shape, arglist):
         model = tf.keras.Sequential()
         model.add(tf.keras.Input(shape=(input_shape,)))
         for layer in arglist.nodes:
-            model.add(tf.keras.layers.Dense(layer, 
-                                            kernel_initializer='glorot_uniform', 
-                                            kernel_regularizer=tf.keras.regularizers.l1(l1=1e-3)))
+            model.add(tf.keras.layers.Dense(
+                layer, 
+                kernel_initializer='glorot_uniform', 
+                kernel_regularizer=tf.keras.regularizers.l1(l1=0.0))
+            )
             if arglist.batchNorm:
                 model.add(tf.keras.layers.BatchNormalization(axis=1))
             model.add(tf.keras.layers.ReLU())
             model.add(tf.keras.layers.Dropout(arglist.dropout))
-        model.add(tf.keras.layers.Dense(2, 
-                                        kernel_initializer='glorot_uniform', 
-                                        kernel_regularizer=tf.keras.regularizers.l1(l1=1e-3),
-                                        activation='softmax'))
+        model.add(tf.keras.layers.Dense(
+            2, 
+            kernel_initializer='glorot_uniform', 
+            kernel_regularizer=tf.keras.regularizers.l1(l1=0.0),
+            activation='softmax')
+        )
 
         # Compile model
         model.compile(

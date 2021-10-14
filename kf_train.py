@@ -5,7 +5,7 @@ folds for cross validation. Also uses the build_model function in the models.py
 file.
 
 Author: Kevin Greif
-Last updated 9/13/21
+Last updated 10/13/21
 python3
 """
 
@@ -84,7 +84,6 @@ extra_branches = ['fjet_match_weight_pt', 'fjet_pt']
 print("Building data objects...")
 dhandler = DataHandler(filepath, "FlatSubstructureJetTree", input_branches,
                        extras=extra_branches, max_constits=args.maxConstits)
-# dhandler.plot_branches(input_branches + extra_branches, directory="./plots/")
 
 # Get data
 print("\nFetching data...")

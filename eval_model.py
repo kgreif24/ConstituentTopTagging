@@ -3,7 +3,7 @@ hlDNN, DNN, EFN, or PFN. It will make use of the DataHandler class to quickly
 generate np arrays of the jet data.
 
 Author: Kevin Greif
-Last updated 9/9/21
+Last updated 10/11/21
 python3
 """
 
@@ -99,24 +99,12 @@ del hl_dh
 print("\nSplitting data arrays...")
 constit_data = constit_arrs[0]
 constit_labels = constit_arrs[1]
-constit_weight = constit_arrs[2]
-constit_events = len(constit_weight)
+constit_pt = constit_arrs[3]
+constit_events = len(constit_pt)
 hl_data = hl_arrs[0]
 hl_labels = hl_arrs[1]
-hl_weight = hl_arrs[2]
-hl_events = len(hl_weight)
-
-# Separate out fold ######################## Debug!
-
-valid_fold_index = 0
-constit_data = np.squeeze(np.array_split(constit_data, 5, axis=0).pop(valid_fold_index))
-constit_labels = np.squeeze(np.array_split(constit_labels, 5, axis=0).pop(valid_fold_index))
-constit_weight = np.squeeze(np.array_split(constit_weight, 5, axis=0).pop(valid_fold_index))
-constit_events = len(constit_weight)
-hl_data = np.squeeze(np.array_split(hl_data, 5, axis=0).pop(valid_fold_index))
-hl_labels = np.squeeze(np.array_split(hl_labels, 5, axis=0).pop(valid_fold_index))
-hl_weight = np.squeeze(np.array_split(hl_weight, 5, axis=0).pop(valid_fold_index))
-hl_events = len(hl_weight)
+hl_pt = hl_arrs[3]
+hl_events = len(hl_pt)
 
 # Verify that there are no NaNs in data
 assert not np.any(np.isnan(constit_data))
@@ -124,7 +112,7 @@ assert not np.any(np.isnan(hl_data))
 
 ############################# Evaluation Loop #############################
 
-for file, type, name in zip(net_file, net_type, net_name):
+for model_num, (file, type, name) in enumerate(zip(net_file, net_type, net_name)):
 
     # Load model
     print("\nLoading model ", name)
@@ -138,16 +126,26 @@ for file, type, name in zip(net_file, net_type, net_name):
         input_shape = np.prod(constit_sample_shape[1:])
         valid_data = constit_data.reshape((constit_events, input_shape))
         valid_labels = constit_labels
+        valid_pt = constit_pt
+        num_events = constit_events 
         print("Shape of validation data: ", np.shape(valid_data))
     elif type == 'hldnn':
         valid_data = hl_data
         valid_labels = hl_labels
+        valid_pt = hl_pt
+        num_events = hl_events
         print("Shape of validation data: ", np.shape(valid_data))
     elif type == 'efn':
         valid_data = [constit_data[:,:,0], constit_data[:,:,1:3]]
+        valid_labels = constit_labels
+        valid_pt = constit_pt
+        num_events = constit_events
         print("Shape of validation data (features): ", len(valid_data))
     elif type == 'pfn':
         valid_data = constit_data
+        valid_labels = constit_labels
+        valid_pt = constit_pt
+        num_evens = constit_events
         print("Shape of validation data:", np.shape(valid_data))
     else:
         raise ValueError("Model type not recognized!")
@@ -167,27 +165,70 @@ for file, type, name in zip(net_file, net_type, net_name):
     plt.legend()
     plt.ylabel("Counts")
     plt.xlabel("Model output")
-    plt.title(name + " output over validation set")
     plt.savefig('./outfiles/' + name + '.png', dpi=300)
     plt.clf()
 
-    # Get ROC curve and AUC
+    # Get total ROC curve and AUC
     fpr, tpr, thresholds = metrics.roc_curve(valid_labels[:,1], preds[:,1])
     auc = metrics.roc_auc_score(valid_labels[:,1], preds[:,1])
     fprinv = 1 / fpr
 
     # Plot inverse roc curve
+    # Also want to fix color for this model
+    if model_num == 0:
+        color = '#b8b8b8'
+    else:
+        color = plt.rcParams['axes.prop_cycle'].by_key()['color'][model_num-1]
     plt.figure(2)
-    plt.plot(tpr, fprinv, label=name)
+    plt.plot(tpr, fprinv, label=name, color=color)
 
     # Find background rejection at tpr = 0.5, 0.8 working points
     wp_p5 = np.argmax(tpr > 0.5)
     wp_p8 = np.argmax(tpr > 0.8)
 
-    # Finally print information on model performance
+    # Print information on total model performance
     print("Background rejection at 0.5 signal efficiency: ", fprinv[wp_p5])
     print("Background rejection at 0.8 signal efficiency: ", fprinv[wp_p8])
     print("AUC score: ", auc)
+
+    # Now we want to bin performance information into pt bins. Let's loop through
+    # an array of bins. Note array defines bin edges so we want to go up to 
+    # len - 1
+    pt_bins = np.linspace(350000, 3150000, 15)
+    jet_indeces = np.arange(0, num_events, 1)
+    wp_50_array = np.zeros(len(pt_bins)-1)
+    wp_80_array = np.zeros(len(pt_bins)-1)
+
+    for i in range(len(pt_bins)-1):
+        
+        # Find indeces of predictions for jets in pt range
+        condition = np.logical_and(valid_pt > pt_bins[i], valid_pt < pt_bins[i+1])
+        bin_indeces = np.asarray(condition).nonzero()[0]
+
+        # Now take a sub-sample of predictions within the pt bin
+        bin_preds = preds[bin_indeces,1]
+        bin_labels = valid_labels[bin_indeces,1]
+
+        # Now we want to calculate background rejection at working points
+        fpr, tpr, thresholds = metrics.roc_curve(bin_labels, bin_preds)
+        fprinv = 1 / fpr
+        wp_p5 = np.argmax(tpr > 0.5)
+        wp_p8 = np.argmax(tpr > 0.8)
+        wp_50_array[i] = fprinv[wp_p5]
+        wp_80_array[i] = fprinv[wp_p8]
+
+    # Now we have binned performance information. Make a step plot!
+    # Find midpoints of bins
+    plt.figure(3)
+    # Some funny buisness to get plotting to come out right
+    wp_50_array = np.concatenate((wp_50_array, wp_50_array[-1:]))
+    wp_80_array = np.concatenate((wp_80_array, wp_80_array[-1:]))
+    plot_bins = pt_bins / 1000
+    label5 = name + r' $\epsilon_{sig} = 0.5$'
+    label8 = name + r' $\epsilon_{sig} = 0.8$'
+    plt.step(plot_bins, wp_50_array, '-', color=color, where='post', label=label5)
+    plt.step(plot_bins, wp_80_array, '--', color=color, where='post', label=label8)
+                            
 
 # Add finishing touches to inverse roc plot
 plt.figure(2)
@@ -196,3 +237,10 @@ plt.legend()
 plt.ylabel('Background rejection')
 plt.xlabel('Signal efficiency')
 plt.savefig("./outfiles/roc.png", dpi=300)
+
+# And on binned performance plot
+plt.figure(3)
+plt.legend()
+plt.ylabel('Background rejection')
+plt.xlabel('Jet pT (GeV)')
+plt.savefig("./outfiles/binned_perf.png", dpi=300)
