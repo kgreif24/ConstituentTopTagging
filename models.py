@@ -40,11 +40,13 @@ def build_model(net_type, sample_shape, arglist):
         # Build model
         model = tf.keras.Sequential()
         model.add(tf.keras.Input(shape=(input_shape,)))
+        if arglist.batchNorm:
+            model.add(tf.keras.layers.BatchNormalization(axis=1))
         for layer in arglist.nodes:
             model.add(tf.keras.layers.Dense(
                 layer, 
                 kernel_initializer='glorot_uniform', 
-                kernel_regularizer=tf.keras.regularizers.l1(l1=0.0))
+                kernel_regularizer=tf.keras.regularizers.l1(l1=0))
             )
             if arglist.batchNorm:
                 model.add(tf.keras.layers.BatchNormalization(axis=1))
@@ -53,13 +55,13 @@ def build_model(net_type, sample_shape, arglist):
         model.add(tf.keras.layers.Dense(
             2, 
             kernel_initializer='glorot_uniform', 
-            kernel_regularizer=tf.keras.regularizers.l1(l1=0.0),
+            kernel_regularizer=tf.keras.regularizers.l1(l1=0),
             activation='softmax')
         )
 
         # Compile model
         model.compile(
-            optimizer=tf.keras.optimizers.Adam(learning_rate=1e-5),
+            optimizer=tf.keras.optimizers.Adam(learning_rate=5e-4),
             loss=tf.keras.losses.CategoricalCrossentropy(from_logits=False),
             metrics=[tf.keras.metrics.CategoricalAccuracy(name='acc')]
         )

@@ -64,13 +64,13 @@ net_name = args.names
 batch_size = args.batchSize
 
 # Data parameters
-filepath = "/pub/kgreif/samples/sample_4p2M_nbpt.root"
+filepath = "/pub/kgreif/samples/sample_1p5M_v7_test.root"
 constit_branches = ['fjet_sortClusNormByPt_pt', 'fjet_sortClusCenterRotFlip_eta',
                   'fjet_sortClusCenterRot_phi', 'fjet_sortClusNormByPt_e']
-hl_branches = ['fjet_Tau1_wta', 'fjet_Tau2_wta', 'fjet_Tau3_wta', 'fjet_Split12',
-                  'fjet_Split23', 'fjet_ECF1', 'fjet_ECF2', 'fjet_ECF3', 'fjet_C2',
-                  'fjet_D2', 'fjet_Qw']
-extra_branches = ['fjet_match_weight_pt', 'fjet_pt']
+hl_branches = ['fjet_Tau1_wta', 'fjet_Tau2_wta', 'fjet_Tau3_wta', 'fjet_Tau4_wta', 
+               'fjet_Split12', 'fjet_Split23', 'fjet_ECF1', 'fjet_ECF2', 'fjet_ECF3', 
+               'fjet_C2', 'fjet_D2', 'fjet_Qw', 'fjet_L2', 'fjet_L3', 'fjet_ThrustMaj']
+extra_branches = ['fjet_pt']
 max_constits = args.maxConstits
 
 ############################# Process Data ################################
@@ -99,11 +99,11 @@ del hl_dh
 print("\nSplitting data arrays...")
 constit_data = constit_arrs[0]
 constit_labels = constit_arrs[1]
-constit_pt = constit_arrs[3]
+constit_pt = constit_arrs[2]
 constit_events = len(constit_pt)
 hl_data = hl_arrs[0]
 hl_labels = hl_arrs[1]
-hl_pt = hl_arrs[3]
+hl_pt = hl_arrs[2]
 hl_events = len(hl_pt)
 
 # Verify that there are no NaNs in data
@@ -176,7 +176,8 @@ for model_num, (file, type, name) in enumerate(zip(net_file, net_type, net_name)
     # Plot inverse roc curve
     # Also want to fix color for this model
     if model_num == 0:
-        color = '#b8b8b8'
+        # color = '#b8b8b8'
+        color = plt.rcParams['axes.prop_cycle'].by_key()['color'][model_num]
     else:
         color = plt.rcParams['axes.prop_cycle'].by_key()['color'][model_num-1]
     plt.figure(2)
@@ -228,7 +229,56 @@ for model_num, (file, type, name) in enumerate(zip(net_file, net_type, net_name)
     label8 = name + r' $\epsilon_{sig} = 0.8$'
     plt.step(plot_bins, wp_50_array, '-', color=color, where='post', label=label5)
     plt.step(plot_bins, wp_80_array, '--', color=color, where='post', label=label8)
-                            
+
+    # Finally we want to bin roc curves and model output by pt
+    # Define some new pt bins
+    hand_pt_bins = np.array([350000, 1000000, 1500000, 2000000, 3000000, 14000000])
+
+    # Loop through hand defined bins
+    for i in range(len(hand_pt_bins)-1):
+
+        # Find indeces of predictions for jets in pt range
+        condition = np.logical_and(valid_pt > hand_pt_bins[i], valid_pt < hand_pt_bins[i+1])
+        bin_indeces = np.asarray(condition).nonzero()[0]
+
+        # Take sub-sample of predictions within pt bin
+        bin_preds = preds[bin_indeces,1]
+        bin_labels = valid_labels[bin_indeces,1]
+
+        # Split into sig/bkg
+        bin_preds_sig = bin_preds[bin_labels==1]
+        bin_preds_bkg = bin_preds[bin_labels==0]
+        
+        # Make model output plot for this pt bin
+        plt.figure(4)
+        plt.hist(bin_preds_sig, bins=hist_bins, alpha=0.5, label='Signal')
+        plt.hist(bin_preds_bkg, bins=hist_bins, alpha=0.5, label='Background')
+        plt.legend()
+        plt.ylabel("Counts")
+        plt.xlabel("Model output")
+        bin_label = "[" + str(hand_pt_bins[i]/1e6) + "," + str(hand_pt_bins[i+1]/1e6) + "]"
+        plt.title(bin_label + " (TeV)")
+        plt.savefig('./outfiles/' + name + '_bin' + str(i) + '.png', dpi=300)
+        plt.clf()
+        
+        # Now find roc curve in this pt bin
+        fpr, tpr, thresholds = metrics.roc_curve(bin_labels, bin_preds)
+        fprinv = 1 / fpr
+
+        # Plot roc curve
+        plt.figure(5)
+        plt.plot(tpr, fprinv, label=bin_label)
+
+    # After looping through bins, we put finishing touches to bin roc plot
+    plt.figure(5)
+    plt.yscale('log')
+    plt.legend()
+    plt.ylabel('Background rejection')
+    plt.xlabel('Signal efficiency')
+    plt.title(name)
+    plt.savefig("./outfiles/" + name + "_binned_roc.png", dpi=300)
+    plt.clf() # Make sure to clear figure for next model!
+        
 
 # Add finishing touches to inverse roc plot
 plt.figure(2)

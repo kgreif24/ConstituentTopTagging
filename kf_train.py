@@ -68,17 +68,17 @@ args = parser.parse_args()
 ####################### Data Handling ######################
 
 # Data parameters
-filepath = "/pub/kgreif/samples/sample_4p2M_nbpt.root"
+filepath = "/pub/kgreif/samples/sample_4p2M_v7.root"
 
 if 'hl' in args.type:
-    input_branches = ['fjet_Tau1_wta', 'fjet_Tau2_wta', 'fjet_Tau3_wta', 'fjet_Split12',
-                      'fjet_Split23', 'fjet_ECF1', 'fjet_ECF2', 'fjet_ECF3', 'fjet_C2',
-                      'fjet_D2', 'fjet_Qw']
+    input_branches = ['fjet_Tau1_wta', 'fjet_Tau2_wta', 'fjet_Tau3_wta', 'fjet_Tau4_wta', 
+                      'fjet_Split12', 'fjet_Split23', 'fjet_ECF1', 'fjet_ECF2', 'fjet_ECF3', 
+                      'fjet_C2', 'fjet_D2', 'fjet_Qw', 'fjet_L2', 'fjet_L3', 'fjet_ThrustMaj']
 else:
     input_branches = ['fjet_sortClusNormByPt_pt', 'fjet_sortClusCenterRotFlip_eta',
                       'fjet_sortClusCenterRot_phi', 'fjet_sortClusNormByPt_e']
 
-extra_branches = ['fjet_match_weight_pt', 'fjet_pt']
+extra_branches = ['fjet_training_weight_pt']
 
 # Now build dhs and use them to plot all branches of interest
 print("Building data objects...")
