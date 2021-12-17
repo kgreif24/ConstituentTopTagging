@@ -1,16 +1,19 @@
 """ kf_train.py - This script will build, train, and evaluate a network,
 implemented with the keras/energyflow packages. It will make use of the
-DataHandler class to quickly generate np arrays of the jet data split into k
-folds for cross validation. Also uses the build_model function in the models.py
-file.
+DataLoader class to pass to a keras fit function. This will allow data to
+be loaded into memory batch by batch making use of h5py's array slicing.
+Hopefully this is fast enough data transfer to make training resonably quick.
 
 Author: Kevin Greif
+<<<<<<< HEAD
 Last updated 10/13/21
+=======
+Last updated 10/4/21
+>>>>>>> lazy
 python3
 """
 
 import sys, os
-import gc
 import argparse
 
 import energyflow as ef
@@ -27,7 +30,8 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 plt.style.use('~/mattyplotsalot/allpurpose.mplstyle')
 
-from data_handler import DataHandler
+from data_loader import DataLoader
+from data_loader import FakeLoader
 import models
 
 
@@ -68,58 +72,39 @@ args = parser.parse_args()
 ####################### Data Handling ######################
 
 # Data parameters
-filepath = "/pub/kgreif/samples/sample_4p2M_v7.root"
-
-if 'hl' in args.type:
-    input_branches = ['fjet_Tau1_wta', 'fjet_Tau2_wta', 'fjet_Tau3_wta', 'fjet_Tau4_wta', 
-                      'fjet_Split12', 'fjet_Split23', 'fjet_ECF1', 'fjet_ECF2', 'fjet_ECF3', 
-                      'fjet_C2', 'fjet_D2', 'fjet_Qw', 'fjet_L2', 'fjet_L3', 'fjet_ThrustMaj']
-else:
-    input_branches = ['fjet_sortClusNormByPt_pt', 'fjet_sortClusCenterRotFlip_eta',
-                      'fjet_sortClusCenterRot_phi', 'fjet_sortClusNormByPt_e']
-
-extra_branches = ['fjet_training_weight_pt']
+filepath = "/pub/kgreif/samples/h5dat/sample_4p2M_stan.hdf5"
+# filepath = "../Data/sample_1p5M_nbpt_test.root"
+# filepath = "/data1/kgreif/sample_4p2M_stan.hdf5"
 
 # Now build dhs and use them to plot all branches of interest
 print("Building data objects...")
-dhandler = DataHandler(filepath, "FlatSubstructureJetTree", input_branches,
-                       extras=extra_branches, max_constits=args.maxConstits)
-
-# Get data
-print("\nFetching data...")
-train_arrs, valid_arrs = dhandler.get_data(
-    net_type=args.type,
-    num_folds=args.numFolds,
-    fold=args.fold - 1  # -1 to make number into array index
-)
+dtrain = DataLoader(filepath, batch_size=args.batchSize, net_type=args.type, num_folds=5, this_fold=2)
+dvalid = DataLoader(filepath, batch_size=args.batchSize, net_type=args.type, num_folds=5, this_fold=2, valid=True)
 
 ########################## Get Model ########################
 
-# To build some models we need to know the sample shape. This information can
-# be obtained from the data handler
-sample_shape = dhandler.sample_shape()
+model = models.build_model(args.type, dtrain.sample_shape, args)
 
-# Now build model
-model = models.build_model(args.type, sample_shape, args)
+# # ##################### Initial Evaluation ####################
 
-##################### Initial Evaluation ####################
+# print("\nPre-train evaluation...")
+# preds = model.predict(dvalid, batch_size=args.batchSize, verbose=1)
 
-print("\nPre-train evaluation...")
-preds = model.predict(valid_arrs[0], batch_size=args.batchSize)
+# # Make a histogram of network output, separated into signal/background
+# labels_vec = dvalid.file['labels'][dvalid.indeces,1]
+# preds_sig = preds[labels_vec == 1]
+# preds_bkg = preds[labels_vec == 0]
+# hist_bins = np.linspace(0, 1.0, 100)
 
-# Make a histogram of network output, separated into signal/background
-preds_sig = preds[valid_arrs[1][:,1] == 1]
-preds_bkg = preds[valid_arrs[1][:,1] == 0]
-hist_bins = np.linspace(0, 1.0, 100)
-
-plt.clf()
-plt.hist(preds_sig[:,1], bins=hist_bins, alpha=0.5, label='Signal')
-plt.hist(preds_bkg[:,1], bins=hist_bins, alpha=0.5, label='Background')
-plt.legend()
-plt.ylabel("Counts")
-plt.xlabel("Model output")
-plt.title("Model output over validation set")
-plt.savefig('./plots/initial_output.png', dpi=300)
+# plt.clf()
+# plt.hist(preds_sig[:,1], bins=hist_bins, alpha=0.5, label='Signal')
+# plt.hist(preds_bkg[:,1], bins=hist_bins, alpha=0.5, label='Background')
+# plt.legend()
+# plt.ylabel("Counts")
+# plt.xlabel("Model output")
+# plt.title("Model output over validation set")
+# plt.savefig('./plots/initial_output.png', dpi=300
+# )
 
 ############################### Train model #################################
 
@@ -147,14 +132,12 @@ tboard_callback = tf.keras.callbacks.TensorBoard(
 # Train model by calling fit
 print("\nTraining model...")
 train_hist = model.fit(
-    train_arrs[0],
-    train_arrs[1],
+    dtrain,
     epochs=args.numEpochs,
     batch_size=args.batchSize,
-    sample_weight=train_arrs[2],
-    validation_data=(valid_arrs[0], valid_arrs[1], valid_arrs[2]),
+    validation_data=dvalid,
     callbacks=[earlystop_callback, check_callback, tboard_callback],
-    verbose=2
+    verbose=1
 )
 
 # Plot losses
@@ -176,11 +159,11 @@ print("\nEvaluate best model...")
 model = tf.keras.models.load_model(args.checkDir)
 
 # Predict
-preds = model.predict(valid_arrs[0], batch_size=args.batchSize)
+preds = model.predict(dvalid, batch_size=args.batchSize)
 
 # Make a histogram of network output, separated into signal/background
-preds_sig = preds[valid_arrs[1][:,1] == 1,:]
-preds_bkg = preds[valid_arrs[1][:,1] == 0,:]
+preds_sig = preds[labels_vec == 1,:]
+preds_bkg = preds[labels_vec == 0,:]
 hist_bins = np.linspace(0, 1.0, 100)
 
 plt.clf()
@@ -193,8 +176,8 @@ plt.title("Model output over validation set")
 plt.savefig("./plots/final_output.png", dpi=300)
 
 # Get ROC curve and AUC
-fpr, tpr, thresholds = metrics.roc_curve(valid_arrs[1][:,1], preds[:,1])
-auc = metrics.roc_auc_score(valid_arrs[1][:,1], preds[:,1])
+fpr, tpr, thresholds = metrics.roc_curve(labels_vec, preds[:,1])
+auc = metrics.roc_auc_score(labels_vec, preds[:,1])
 fprinv = 1 / fpr
 
 # Find background rejection at tpr = 0.5, 0.8 working points

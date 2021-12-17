@@ -154,7 +154,7 @@ class DataHandler():
 
         # First send all of the labels to a 1 hot encoded
         # array. Hardcode 2 classes (signal, background)
-        cat_labels =  np.eye(2, dtype='float32')[self.labels]
+        cat_labels = np.eye(2, dtype='float32')[self.labels]
 
         # Initialize drop index list for cut event indeces
         drop_index_list = []

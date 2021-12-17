@@ -11,6 +11,7 @@ import energyflow as ef
 from energyflow.archs import EFN
 from classification_models.tfkeras import Classifiers
 import tensorflow as tf
+from keras_applications.resnext import ResNeXt50
 import sklearn.metrics as metrics
 import numpy as np
 
@@ -108,21 +109,23 @@ def build_model(net_type, sample_shape, arglist):
         )
 
     elif net_type == 'resnet':
-        
-        ResNeXt50, preprocess_input = Classifiers.get('resnext50')
-        res_model = ResNeXt50(include_top=False, input_shape=(224, 224, 3), weights=None)
-        model = tf.keras.models.Sequential()
-        model.add(res_model)
-        model.add(tf.keras.layers.GlobalAveragePooling2D(data_format='channels_last'))
-        model.add(tf.keras.layers.Dense(2, activation='softmax'))
+
+        # Define ResNeXt model using functional API
+        input_tens = tf.keras.layers.Input(shape=(224, 224, 1))
+        resnext = ResNeXt50(input_tensor=input_tens, include_top=False, weights=None,
+                            backend=tf.keras.backend, layers=tf.keras.layers, models=tf.keras.models,
+                            utils=tf.keras.utils)
+        max_pool = tf.keras.layers.GlobalAveragePooling2D(data_format='channels_last')(resnext.output)
+        top_layer = tf.keras.layers.Dense(2, activation='softmax')(max_pool)
+        model = tf.keras.models.Model(inputs=input_tens, outputs=top_layer)
 
         # Compile model
         model.compile(
-            optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3),
+            optimizer=tf.keras.optimizers.Adam(learning_rate=5e-4),
             loss=tf.keras.losses.CategoricalCrossentropy(from_logits=False),
             metrics=[tf.keras.metrics.CategoricalAccuracy(name='acc')]
         )
-        
+
         model.summary()
 
     else:
