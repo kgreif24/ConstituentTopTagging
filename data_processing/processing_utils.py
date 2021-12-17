@@ -201,7 +201,7 @@ def standardize(file, calc_events=1000000):
         print("Now standardizing", hl_var)
 
         # Pull data
-        variable = file[hl_var][:calc_events]
+        variable = file[hl_var][:]
         
         # For variables with large magnitudes (ECFs) divide by a large value to head off
         # overflows in calculating mean and stddev
@@ -209,10 +209,13 @@ def standardize(file, calc_events=1000000):
             variable /= 1e10
         elif hl_var == 'fjet_ECF2':
             variable /= 1e6
+
+        # Pull calculation variables
+        calc_variable = variable[:calc_events]
         
         # Calculate mean and std deviation
-        mean = variable.mean()
-        stddev = variable.std()
+        mean = calc_variable.mean()
+        stddev = calc_variable.std()
 
         # Standardize and write
         std_variable = (variable - mean) / stddev

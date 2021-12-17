@@ -1,0 +1,50 @@
+Error in <TFile::TFile>: file /DFS-L/DATA/whiteson/kgreif/ModTaggingData/user.csauer.364703.Pythia8EvtGen_A14NNPDF23LO_jetjet_JZ3WithSW.Flattener_v2.UFOVSD.Constit_tree.root/user.csauer.23228583._000009.tree.root already exists
+
+ *** Break *** segmentation violation
+
+
+
+===========================================================
+There was a crash.
+This is the entire stack trace of all threads:
+===========================================================
+#0  0x00007fb1c18a34fc in waitpid () from /lib64/libc.so.6
+#1  0x00007fb1c1820f62 in do_system () from /lib64/libc.so.6
+#2  0x00007fb1c6931663 in TUnixSystem::StackTrace() () from /cvmfs/sft.cern.ch/lcg/views/LCG_97a/x86_64-centos7-gcc8-opt/lib/libCore.so
+#3  0x00007fb1c6933eb4 in TUnixSystem::DispatchSignals(ESignals) () from /cvmfs/sft.cern.ch/lcg/views/LCG_97a/x86_64-centos7-gcc8-opt/lib/libCore.so
+#4  <signal handler called>
+#5  0x00007fb1c5f69cfa in TBufferIO::TagStreamerInfo(TVirtualStreamerInfo*) () from /cvmfs/sft.cern.ch/lcg/views/LCG_97a/x86_64-centos7-gcc8-opt/lib/libRIO.so
+#6  0x00007fb1c61a6f25 in int TStreamerInfo::WriteBufferAux<char**>(TBuffer&, char** const&, TStreamerInfo::TCompInfo* const*, int, int, int, int, int) () from /cvmfs/sft.cern.ch/lcg/views/LCG_97a/x86_64-centos7-gcc8-opt/lib/libRIO.so
+#7  0x00007fb1c60185ed in TStreamerInfoActions::GenericWriteAction(TBuffer&, void*, TStreamerInfoActions::TConfiguration const*) () from /cvmfs/sft.cern.ch/lcg/views/LCG_97a/x86_64-centos7-gcc8-opt/lib/libRIO.so
+#8  0x00007fb1c5f5d3d5 in TBufferFile::ApplySequence(TStreamerInfoActions::TActionSequence const&, void*) () from /cvmfs/sft.cern.ch/lcg/views/LCG_97a/x86_64-centos7-gcc8-opt/lib/libRIO.so
+#9  0x00007fb1c4709384 in TBranch::FillImpl(ROOT::Internal::TBranchIMTHelper*) [clone .part.106] () from /cvmfs/sft.cern.ch/lcg/views/LCG_97a/x86_64-centos7-gcc8-opt/lib/libTree.so
+#10 0x00007fb1c471653d in TBranchElement::FillImpl(ROOT::Internal::TBranchIMTHelper*) () from /cvmfs/sft.cern.ch/lcg/views/LCG_97a/x86_64-centos7-gcc8-opt/lib/libTree.so
+#11 0x00007fb1c477b6de in TTree::Fill() () from /cvmfs/sft.cern.ch/lcg/views/LCG_97a/x86_64-centos7-gcc8-opt/lib/libTree.so
+#12 0x00007fb1c477b034 in TTree::CopyEntries(TTree*, long long, char const*) () from /cvmfs/sft.cern.ch/lcg/views/LCG_97a/x86_64-centos7-gcc8-opt/lib/libTree.so
+#13 0x00007fb1c477a9f0 in TTree::CloneTree(long long, char const*) () from /cvmfs/sft.cern.ch/lcg/views/LCG_97a/x86_64-centos7-gcc8-opt/lib/libTree.so
+#14 0x000000000042b442 in JetAugment::process(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) ()
+#15 0x000000000042c058 in main ()
+===========================================================
+
+
+The lines below might hint at the cause of the crash.
+You may get help by asking at the ROOT forum http://root.cern.ch/forum
+Only if you are really convinced it is a bug in ROOT then please submit a
+report at http://root.cern.ch/bugs Please post the ENTIRE stack trace
+from above as an attachment in addition to anything else
+that might help us fixing this issue.
+===========================================================
+#5  0x00007fb1c5f69cfa in TBufferIO::TagStreamerInfo(TVirtualStreamerInfo*) () from /cvmfs/sft.cern.ch/lcg/views/LCG_97a/x86_64-centos7-gcc8-opt/lib/libRIO.so
+#6  0x00007fb1c61a6f25 in int TStreamerInfo::WriteBufferAux<char**>(TBuffer&, char** const&, TStreamerInfo::TCompInfo* const*, int, int, int, int, int) () from /cvmfs/sft.cern.ch/lcg/views/LCG_97a/x86_64-centos7-gcc8-opt/lib/libRIO.so
+#7  0x00007fb1c60185ed in TStreamerInfoActions::GenericWriteAction(TBuffer&, void*, TStreamerInfoActions::TConfiguration const*) () from /cvmfs/sft.cern.ch/lcg/views/LCG_97a/x86_64-centos7-gcc8-opt/lib/libRIO.so
+#8  0x00007fb1c5f5d3d5 in TBufferFile::ApplySequence(TStreamerInfoActions::TActionSequence const&, void*) () from /cvmfs/sft.cern.ch/lcg/views/LCG_97a/x86_64-centos7-gcc8-opt/lib/libRIO.so
+#9  0x00007fb1c4709384 in TBranch::FillImpl(ROOT::Internal::TBranchIMTHelper*) [clone .part.106] () from /cvmfs/sft.cern.ch/lcg/views/LCG_97a/x86_64-centos7-gcc8-opt/lib/libTree.so
+#10 0x00007fb1c471653d in TBranchElement::FillImpl(ROOT::Internal::TBranchIMTHelper*) () from /cvmfs/sft.cern.ch/lcg/views/LCG_97a/x86_64-centos7-gcc8-opt/lib/libTree.so
+#11 0x00007fb1c477b6de in TTree::Fill() () from /cvmfs/sft.cern.ch/lcg/views/LCG_97a/x86_64-centos7-gcc8-opt/lib/libTree.so
+#12 0x00007fb1c477b034 in TTree::CopyEntries(TTree*, long long, char const*) () from /cvmfs/sft.cern.ch/lcg/views/LCG_97a/x86_64-centos7-gcc8-opt/lib/libTree.so
+#13 0x00007fb1c477a9f0 in TTree::CloneTree(long long, char const*) () from /cvmfs/sft.cern.ch/lcg/views/LCG_97a/x86_64-centos7-gcc8-opt/lib/libTree.so
+#14 0x000000000042b442 in JetAugment::process(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) ()
+#15 0x000000000042c058 in main ()
+===========================================================
+
+
