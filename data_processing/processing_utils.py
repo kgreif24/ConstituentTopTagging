@@ -107,11 +107,26 @@ def calc_weights(file, weight_func):
 
     # Pull pt and other info from file
     pt_name = file.attrs.get("pt")[0]
+    label_name = file.attrs.get("label")[0]
     num_jets = file.attrs.get("num_jets")
     pt = file[pt_name][:]
+    labels = file[label_name][:]
 
-    # Calculate weights
-    weights = weight_func(pt)
+    # Separate signal and background pt
+    indeces = np.arange(0, num_jets, 1)
+    sig_ind = indeces[labels == 1]
+    bkg_ind = indeces[labels == 0]
+    sig_pt = pt[sig_ind]
+    bkg_pt = pt[bkg_ind]
+
+    # Calculate weights for signal / background
+    sig_weights = weight_func(sig_pt)
+    bkg_weights = weight_func(bkg_pt)
+
+    # Assemble single vector of weights
+    weights = np.ones(num_jets)
+    weights[sig_ind] = sig_weights
+    weights[bkg_ind] = bkg_weights
 
     # Create new dataset in file
     weight_shape = (num_jets,)

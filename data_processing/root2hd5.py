@@ -6,7 +6,7 @@ by indeces (except for lazy arrays, but these are very slow).
 
 Author: Kevin Greif
 python3
-Last updated 12/13/21
+Last updated 12/19/21
 """
 
 import sys, os
@@ -53,7 +53,7 @@ target_branches = source_branches + images_branch + label_branch
 max_constits = 200
 
 # Set number of files we are going to break jets into
-n_files = 12
+n_files = 36
 
 # Setup cuts we want to make on jets
 common = "(abs(fjet_truthJet_eta)<2.0) & (fjet_truthJet_pt/1000.>350.) & (fjet_numConstituents > 3)"

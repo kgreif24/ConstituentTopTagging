@@ -37,8 +37,8 @@ print("N test jets:", n_test)
 
 # Make new h5 files for training/testing, using guide of reference file
 print("Building train/test h5 files...")
-f_train = h5py.File('./dataloc/train.h5', 'w')
-f_test = h5py.File('./dataloc/test.h5', 'w')
+f_train = h5py.File('./dataloc/train.h5', 'a')
+f_test = h5py.File('./dataloc/test.h5', 'a')
 f_ref = h5py.File(file_list[0], 'r')
 for file, num_jets in zip([f_train, f_test], [n_train, n_test]):
     for key in f_ref.keys():
