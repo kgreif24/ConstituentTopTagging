@@ -58,7 +58,7 @@ def find_h5_len(filename):
     return f['labels'].shape[0]
 
 
-def flat_weights(pt, n_bins=200):
+def flat_weights(pt, n_bins=200, **kwargs):
     """ flat_weights - This function will use the hepml reweight function
     to calculate weights that flatten the pT distribution passed in as a numpy
     array pt. This reweighting is done separately for signal/background, so we
@@ -84,6 +84,32 @@ def flat_weights(pt, n_bins=200):
     reweighter = reweight.BinsReweighter(n_bins=n_bins, n_neighs=3)
     reweighter.fit(pt, target=target)
 
+    # Predict new weights
+    weights = reweighter.predict_weights(pt)
+    weights /= weights.mean()
+
+    return weights
+
+
+def match_weights(pt, target, n_bins=200):
+    """ match_weights - This function will use the hepml reweight function
+    to calculate weights which match the pt distribution to the target
+    distribution. Usually used to match the bkg pt distribution to the 
+    signal.
+
+    Arguments:
+    pt (array) - Distribution to calculate weights for
+    target (array) - Distribution to match
+    n_bins (int) 
+
+    Returns:
+    (array) - vector of weights for pt
+    """
+
+    # Fit reweighter to target distribution
+    reweighter = reweight.BinsReweighter(n_bins=n_bins)
+    reweighter.fit(pt, target=target)
+    
     # Predict new weights
     weights = reweighter.predict_weights(pt)
     weights /= weights.mean()
@@ -119,14 +145,12 @@ def calc_weights(file, weight_func):
     sig_pt = pt[sig_ind]
     bkg_pt = pt[bkg_ind]
 
-    # Calculate weights for signal / background
-    sig_weights = weight_func(sig_pt)
-    bkg_weights = weight_func(bkg_pt)
+    # Calculate weights for signal
+    sig_weights = weight_func(bkg_pt, sig_pt)
 
     # Assemble single vector of weights
-    weights = np.ones(num_jets)
-    weights[sig_ind] = sig_weights
-    weights[bkg_ind] = bkg_weights
+    weights = np.ones(num_jets, dtype=np.float32)
+    weights[bkg_ind] = weights
 
     # Create new dataset in file
     weight_shape = (num_jets,)
@@ -135,9 +159,9 @@ def calc_weights(file, weight_func):
 
 
 def send_data(file_list, target):
-    """ send_data - This function takes in a list of .h5 files, 
-    and then takes each dataset in the files and writes them to target file.
-    This is a method for "adding" h5 files while also shuffling their contents.
+    """ send_data - This function takes in a list of intermediate .h5 files and from
+    them constructs train/test files with stacked constituent and hl information. It
+    will also transfer over label, pt, and image information.
 
     Arguments:
     file_list (list) - A list containing strings giving the path of files to add
@@ -160,26 +184,50 @@ def send_data(file_list, target):
         num_file_jets = file.attrs.get("num_jets")
         stop_index = start_index + num_file_jets
 
-        # Extract keys for all datasets
-        file_keys = file.keys()
+        # Extract dataset names from attributes
+        constit_branches = file.attrs.get('constit')
+        hl_branches = file.attrs.get('hl')
+        image_branch = file.attrs.get('img')
+        pt_branch = file.attrs.get('pt')
+        label_branch = file.attrs.get('label')
+        unstacked = np.concatenate((image_branch, pt_branch, label_branch))
 
         # Get random seed for our shuffles
         rng_seed = np.random.default_rng()
-        seed = rng_seed.integers(1000)
+        rseed = rng_seed.integers(1000)
 
-        # Loop through each of the datasets
-        for key in file_keys:
-            print("Processing branch", key)
-            
-            # Extract all data from file
-            dataset = file[key][...]
+        # Constituents
+        print("Processing constituents")
+        constit_list = []
+        for cons in constit_branches:
+            this_cons = file[cons][...]
+            branch_shuffle(this_cons, seed=rseed)
+            constit_list.append(this_cons)
+        # Stack all constituents along last axis here
+        constits = np.stack(constit_list, axis=-1)
+        # And write to target file
+        target['constit'][start_index:stop_index,...] = constits
+        del constits
 
-            # Initialize new rng using seed and shuffle dataset
-            rng = np.random.default_rng(seed)
-            rng.shuffle(dataset, axis=0)
+        # HL variables
+        print("Processing hl vars")
+        hlvars_list = []
+        for var in hl_branches:
+            this_var = file[var][:]
+            branch_shuffle(this_var, seed=rseed)
+            hlvars_list.append(this_var)
+        # Stack all hl variables
+        hlvars = np.stack(hlvars_list, axis=-1)
+        # And write to target file
+        target['hl'][start_index:stop_index,...] = hlvars
+        del hlvars
 
-            # Write shuffled data to target file
-            target[key][start_index:stop_index,...] = dataset
+        # Others
+        print("Processing images, labels, and pT")
+        for branch in unstacked:
+            dataset = file[branch][...]
+            branch_shuffle(dataset, seed=rseed)
+            target[branch][start_index:stop_index,...] = dataset
 
         # Increment counters and close file
         start_index = stop_index
@@ -188,6 +236,23 @@ def send_data(file_list, target):
     # End by printing summary of how many jets were written to file
     print("We wrote", stop_index, "jets to target file")
     target.attrs.modify("num_jets", stop_index)
+
+
+def branch_shuffle(branch, seed=42):
+    """ branch_shuffle - This shuffle takes in a dataset represented by a numpy array,
+    as well as a seed for a random generator. It will then shuffle the branch using numpys
+    random shuffle routine.
+
+    Arguments:
+    branch (array) - The array to shuffle along the first dimension
+    seed (int) - The random seed to use in shuffling
+
+    Returns:
+    None - array is shuffled in place
+    """
+    
+    rng = np.random.default_rng(seed)
+    rng.shuffle(branch, axis=0)
 
 
 

@@ -17,7 +17,7 @@ import processing_utils as pu
 
 # We start by finding a list of all intermediate files sitting in intermediate
 # file folder.
-search_string = "./dataloc/intermediates/*.h5"
+search_string = "./dataloc/intermediates_small/*.h5"
 file_list = glob.glob(search_string)
 print("Will process files", file_list)
 
@@ -27,7 +27,8 @@ total_jets = np.sum(file_lengths)
 
 # Make train / test split by partitioning file_list
 ratio = 0.8
-split_index = int(np.around(len(file_list) * 0.8) - 1)
+split_index = int(np.around(len(file_list) * 0.8))
+print(split_index)
 train_list = file_list[:split_index]
 test_list = file_list[split_index:]
 n_train = np.sum(file_lengths[:split_index])
@@ -35,18 +36,37 @@ n_test = np.sum(file_lengths[split_index:])
 print("N train jets:", n_train)
 print("N test jets:", n_test)
 
-# Make new h5 files for training/testing, using guide of reference file
+# Make new h5 files for training/testin. Will have stacked data for easy use in
+# network trainng
 print("Building train/test h5 files...")
-f_train = h5py.File('./dataloc/train.h5', 'a')
-f_test = h5py.File('./dataloc/test.h5', 'a')
+f_train = h5py.File('./dataloc/train.h5', 'w')
+f_test = h5py.File('./dataloc/test.h5', 'w')
 f_ref = h5py.File(file_list[0], 'r')
+constit_branches = f_ref.attrs.get('constit')
+hl_branches = f_ref.attrs.get('hl')
+
+# Loop to build datasets for train/test files
 for file, num_jets in zip([f_train, f_test], [n_train, n_test]):
-    for key in f_ref.keys():
-        key_shape = (num_jets,) + f_ref[key].shape[1:]
-        key_type = f_ref[key].dtype
-        file.create_dataset(key, key_shape, key_type)
-    for key, value in f_ref.attrs.items():
-        file.attrs.create(key, value)
+
+    # Constituents
+    constit_shape = (num_jets, 200, len(constit_branches))
+    file.create_dataset('constit', constit_shape, dtype='f4')
+
+    # HL variables
+    hl_shape = (num_jets, len(hl_branches))
+    file.create_dataset('hl', hl_shape, dtype='f4')
+
+    # Lables, pT, and images (weights added later)
+    img_shape = (num_jets, 200, 2)
+    oth_shape = (num_jets,)
+    file.create_dataset('images', img_shape, dtype='i4')
+    file.create_dataset('labels', oth_shape, dtype='i4')
+    file.create_dataset('fjet_pt', oth_shape, dtype='f4')
+
+    # Attributes
+    file.attrs.create("num_jets", num_jets)
+    file.attrs.create("num_cons", len(constit_branches))
+    file.attrs.create("num_hl", len(hl_branches))
 
 # Send data to train/test
 print("\nBegin processing data")
@@ -61,8 +81,8 @@ pu.standardize(f_test)
 
 # Calculate weights
 print("\nCalculating weights")
-pu.calc_weights(f_train, pu.flat_weights)
-pu.calc_weights(f_test, pu.flat_weights)
+pu.calc_weights(f_train, pu.match_weights)
+pu.calc_weights(f_test, pu.match_weights)
 
 print("Finished buildling train/test files")
 

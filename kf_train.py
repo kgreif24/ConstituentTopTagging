@@ -5,11 +5,7 @@ be loaded into memory batch by batch making use of h5py's array slicing.
 Hopefully this is fast enough data transfer to make training resonably quick.
 
 Author: Kevin Greif
-<<<<<<< HEAD
-Last updated 10/13/21
-=======
-Last updated 10/4/21
->>>>>>> lazy
+Last updated 12/20/21
 python3
 """
 
@@ -17,7 +13,6 @@ import sys, os
 import argparse
 
 import energyflow as ef
-from energyflow.archs import EFN
 import tensorflow as tf
 import sklearn.metrics as metrics
 import numpy as np
@@ -72,9 +67,7 @@ args = parser.parse_args()
 ####################### Data Handling ######################
 
 # Data parameters
-filepath = "/pub/kgreif/samples/h5dat/sample_4p2M_stan.hdf5"
-# filepath = "../Data/sample_1p5M_nbpt_test.root"
-# filepath = "/data1/kgreif/sample_4p2M_stan.hdf5"
+filepath = "./dataloc/train.h5"
 
 # Now build dhs and use them to plot all branches of interest
 print("Building data objects...")

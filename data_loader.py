@@ -34,7 +34,7 @@ class DataLoader(Sequence):
     class.
     """
 
-    def __init__(self, file_path, batch_size=100, valid=False, shuffle=True,
+    def __init__(self, file_path, batch_size=100, valid=False,
                  net_type='dnn', num_folds=5, this_fold=1):
         """ __init__ - Init function for this class. Will load in root file
         using uproot. As Sequence class has no specific init function, don't
@@ -45,7 +45,6 @@ class DataLoader(Sequence):
             batch_size (int): The number of jets in each batch, used to
             calculate length of the loader
             valid (bool): If true, feed validation partition and not training
-            shuffle (bool): If true, shuffle jets before each epoch
             net_type (string): Specifies the model specific data preparation to use
             num_folds (int): The number of folds data is split into
             this_fold (int): The number of the fold to use, 1-num_folds
@@ -58,7 +57,6 @@ class DataLoader(Sequence):
         self.max_constits = 80 # Hardcoded for now, see file doc string
         self.batch_size = batch_size
         self.valid = valid
-        self.shuffle = shuffle
         self.net_type = net_type
 
         # Load hdf5 file using h5py, braches will be loaded in get item function
@@ -71,9 +69,9 @@ class DataLoader(Sequence):
 
         # Now we need to find the sample shape, depends on net_type
         if 'hl' in self.net_type:
-            self.sample_shape = (self.file['hl'].shape[1],)
+            self.sample_shape = (self.file.attrs.get("num_hl",))
         else:
-            self.sample_shape = (self.max_constits, 4)
+            self.sample_shape = (self.max_constits, self.file.attrs.get("num_cons"))
 
         # Decide train/valid split for the given fold. Generator will only
         # return data from one of these partitions, depending on the to_fit flag.
@@ -140,7 +138,7 @@ class DataLoader(Sequence):
         elif self.net_type == 'resnet':
             data_key = 'images'
         else:
-            data_key = 'constits'
+            data_key = 'constit'
 
         # We watch to use different indexing for the "seam" batch and all other batches
         # Condition on this here. Note this will never happen for validation sequences
@@ -151,16 +149,16 @@ class DataLoader(Sequence):
 
             # Given this is true, we just index using a slice of the numpy array
             batch_indeces = self.indeces[start:stop]
-            batch_data = self.file[data_key][batch_indeces]
+            batch_data = self.file[data_key][batch_indeces,...]
 
             # Resnet needs pt data for pixel intensity
             if self.net_type == 'resnet':
-                batch_pt = self.file['constits'][batch_indeces,:,0]
+                batch_pt = self.file['constit'][batch_indeces,:,0]
 
             # We also need to load labels and weights, since this conditional will only
             # occur if we are training
             assert not self.valid
-            batch_labels = self.file['labels'][batch_indeces,:]
+            batch_labels = self.file['labels'][batch_indeces]
             batch_weights = self.file['weights'][batch_indeces]
 
         else:
@@ -171,11 +169,11 @@ class DataLoader(Sequence):
             # since stop is one more than an index. However we want to add 1 to the number at stop-1
             # as this number needs to be turned into the second number in a slice. What a mess.
             batch_stop = self.indeces[stop-1] + 1
-            batch_data = self.file[data_key][batch_start:batch_stop]
+            batch_data = self.file[data_key][batch_start:batch_stop,...]
 
             # Again, resnet needs pt data for pixel intensity
             if self.net_type == 'resnet':
-                batch_pt = self.file['constits'][batch_start:batch_stop,:,0]
+                batch_pt = self.file['constit'][batch_start:batch_stop,:,0]
 
             # Now load labels and weights the regular way
             batch_labels = self.file['labels'][batch_start:batch_stop,:]
@@ -185,7 +183,7 @@ class DataLoader(Sequence):
         if 'dnn' in self.net_type:
 
             # Input shape for all dnn networks can be found from sample shape
-            input_shape = np.prod(self.sample_shape)
+            input_shape = self.sample_shape
 
             # Now we do reshaping
             shaped_data = batch_data.reshape((this_bs, input_shape))
@@ -193,12 +191,14 @@ class DataLoader(Sequence):
         elif self.net_type == 'efn':
 
             # For EFNs, we need to split pT and angular information
-            shaped_data = [batch_data[:,:,0], batch_data[:,:,1:3]]
+            pT = batch_data[:,:self.max_constits,0]
+            ang = batch_data[:,:self.max_constits,1:3]
+            shaped_data = [pT, ang]
 
         elif self.net_type == 'pfn':
 
-            # For PFNs, we don't need to do anything!
-            shaped_data = batch_data
+            # For PFNs, we don't need to do anything (except index number of constits)
+            shaped_data = batch_data[:,:self.max_constits,:]
 
         elif self.net_type == 'resnet':
 
@@ -237,7 +237,7 @@ class FakeLoader(Sequence):
 if __name__ == '__main__':
 
     # Let's set up some simple testing code.
-    filepath = "/pub/kgreif/samples/h5dat/sample_4p2M_stan.hdf5"
+    filepath = "./dataloc/train.h5"
 
     dloader = DataLoader(filepath)
 
