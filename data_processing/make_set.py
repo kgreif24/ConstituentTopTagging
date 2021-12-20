@@ -67,17 +67,18 @@ for file, num_jets in zip([f_train, f_test], [n_train, n_test]):
     file.attrs.create("num_jets", num_jets)
     file.attrs.create("num_cons", len(constit_branches))
     file.attrs.create("num_hl", len(hl_branches))
+    file.attrs.create("constit", constit_branches)
+    file.attrs.create("hl", hl_branches)
+
+# Calculate standards to be used in sending data to train/test files
+# just using first file in file list for calculation
+means, stddevs = pu.calc_standards(file_list[0])
 
 # Send data to train/test
 print("\nBegin processing data")
 
-pu.send_data(train_list, f_train)
-pu.send_data(test_list, f_test)
-
-# Standardize hl variables
-print("\nStandardizing hl variables")
-pu.standardize(f_train)
-pu.standardize(f_test)
+pu.send_data(train_list, f_train, means, stddevs)
+pu.send_data(test_list, f_test, means, stddevs)
 
 # Calculate weights
 print("\nCalculating weights")

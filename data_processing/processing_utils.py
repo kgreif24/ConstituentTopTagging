@@ -131,12 +131,10 @@ def calc_weights(file, weight_func):
     None
     """
 
-    # Pull pt and other info from file
-    pt_name = file.attrs.get("pt")[0]
-    label_name = file.attrs.get("label")[0]
+    # Pull info from file
     num_jets = file.attrs.get("num_jets")
-    pt = file[pt_name][:]
-    labels = file[label_name][:]
+    pt = file['fjet_pt'][:]
+    labels = file['labels'][:]
 
     # Separate signal and background pt
     indeces = np.arange(0, num_jets, 1)
@@ -146,11 +144,11 @@ def calc_weights(file, weight_func):
     bkg_pt = pt[bkg_ind]
 
     # Calculate weights for signal
-    sig_weights = weight_func(bkg_pt, sig_pt)
+    bkg_weights = weight_func(bkg_pt, sig_pt)
 
     # Assemble single vector of weights
     weights = np.ones(num_jets, dtype=np.float32)
-    weights[bkg_ind] = weights
+    weights[bkg_ind] = bkg_weights
 
     # Create new dataset in file
     weight_shape = (num_jets,)
@@ -158,7 +156,7 @@ def calc_weights(file, weight_func):
     weight_data[:] = weights
 
 
-def send_data(file_list, target):
+def send_data(file_list, target, hl_means, hl_stddevs):
     """ send_data - This function takes in a list of intermediate .h5 files and from
     them constructs train/test files with stacked constituent and hl information. It
     will also transfer over label, pt, and image information.
@@ -167,6 +165,9 @@ def send_data(file_list, target):
     file_list (list) - A list containing strings giving the path of files to add
     target (obj) - h5 file object for the target file. Assumes we have write permissions
     and that the dataset structure of target is exactly the same as the source files.
+    hl_means (list) - A list of hl means to apply in standardization
+    hl_stddevs (list) - A list of hl std. deviations to apply in standardization. Must
+    have the same length as the number of hl vars.
 
     Returns:
     None
@@ -176,7 +177,7 @@ def send_data(file_list, target):
     start_index = 0
 
     # Loop through file list
-    for file_name in file_list:
+    for i, file_name in enumerate(file_list):
         print("Now processing file:", file_name)
 
         # Open file
@@ -199,10 +200,12 @@ def send_data(file_list, target):
         # Constituents
         print("Processing constituents")
         constit_list = []
+
         for cons in constit_branches:
             this_cons = file[cons][...]
             branch_shuffle(this_cons, seed=rseed)
             constit_list.append(this_cons)
+
         # Stack all constituents along last axis here
         constits = np.stack(constit_list, axis=-1)
         # And write to target file
@@ -212,17 +215,28 @@ def send_data(file_list, target):
         # HL variables
         print("Processing hl vars")
         hlvars_list = []
-        for var in hl_branches:
+
+        for var, mean, stddev in zip(hl_branches, hl_means, hl_stddevs):
             this_var = file[var][:]
             branch_shuffle(this_var, seed=rseed)
-            hlvars_list.append(this_var)
+            
+            # Catch for annoying ECF functions which have large magnitudes
+            if var == 'fjet_ECF3':
+                this_var /= 1e10
+            elif var == 'fjet_ECF2':
+                this_var /= 1e6
+            
+            # Standardize variable using information passed in as argument
+            stan_var = (this_var - mean) / stddev
+            hlvars_list.append(stan_var)
+
         # Stack all hl variables
         hlvars = np.stack(hlvars_list, axis=-1)
         # And write to target file
         target['hl'][start_index:stop_index,...] = hlvars
         del hlvars
 
-        # Others
+        # Other information, including images, labels, and jet pT
         print("Processing images, labels, and pT")
         for branch in unstacked:
             dataset = file[branch][...]
@@ -255,48 +269,47 @@ def branch_shuffle(branch, seed=42):
     rng.shuffle(branch, axis=0)
 
 
-
-def standardize(file, calc_events=1000000):
-    """ shuffle - Takes in an h5py file object and standardizes each of the datasets
-    that are in the "hl" attribute. Assumes each of these datasets are one dimensional.
-    This function works in place so file objec must have read/write permissions.
+def calc_standards(file):
+    """ calc_standards - This function will calculate the mean and std. deviation of each 
+    high level variable in a given .h5 file. It will return these standards as two lists.
 
     Arguments:
-    file (obj) - The h5 file object in which we will standardize hl variables
-    calc_events (int) - The number of events we will consider in calculating mean/stddev
+    file (string) - The path to the file we will use to calculate the means and standard deviations.
 
     Returns:
-    None
+    (list) - The means of each hl var in our file
+    (list) - The std. deviations
     """
 
-    # Correct calc_events if needed
-    if calc_events > file['labels'].shape[0]:
-        calc_events = file['labels'].shape[0]
+    # Open file
+    f = h5py.File(file, 'r')
 
-    # Pull hl attribute
-    hl_list = file.attrs.get("hl")
+    # Pull hl var names
+    hl_vars = f.attrs.get('hl')
 
-    # Loop through hl variables
-    for hl_var in hl_list:
-        print("Now standardizing", hl_var)
+    # Initialize empty lists
+    means_list = []
+    stddevs_list = []
+
+    # Loop through hl vars
+    for var in hl_vars:
 
         # Pull data
-        variable = file[hl_var][:]
-        
+        data = f[var][:]
+
         # For variables with large magnitudes (ECFs) divide by a large value to head off
         # overflows in calculating mean and stddev
-        if hl_var == 'fjet_ECF3':
-            variable /= 1e10
-        elif hl_var == 'fjet_ECF2':
-            variable /= 1e6
+        if var == 'fjet_ECF3':
+            data /= 1e10
+        elif var == 'fjet_ECF2':
+            data /= 1e6
 
-        # Pull calculation variables
-        calc_variable = variable[:calc_events]
-        
-        # Calculate mean and std deviation
-        mean = calc_variable.mean()
-        stddev = calc_variable.std()
+        # Calculate mean and std. dev
+        mean = data.mean()
+        stddev = data.std()
 
-        # Standardize and write
-        std_variable = (variable - mean) / stddev
-        file[hl_var][:] = std_variable
+        # Append to lists
+        means_list.append(mean)
+        stddevs_list.append(stddev)
+
+    return means_list, stddevs_list
