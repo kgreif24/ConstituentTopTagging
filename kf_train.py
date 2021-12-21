@@ -78,26 +78,26 @@ dvalid = DataLoader(filepath, batch_size=args.batchSize, net_type=args.type, num
 
 model = models.build_model(args.type, dtrain.sample_shape, args)
 
-# # ##################### Initial Evaluation ####################
+##################### Initial Evaluation ####################
 
-# print("\nPre-train evaluation...")
-# preds = model.predict(dvalid, batch_size=args.batchSize, verbose=1)
+print("\nPre-train evaluation...")
+preds = model.predict(dvalid, batch_size=args.batchSize, verbose=1)
 
-# # Make a histogram of network output, separated into signal/background
-# labels_vec = dvalid.file['labels'][dvalid.indeces,1]
-# preds_sig = preds[labels_vec == 1]
-# preds_bkg = preds[labels_vec == 0]
-# hist_bins = np.linspace(0, 1.0, 100)
+# Make a histogram of network output, separated into signal/background
+labels_vec = dvalid.file['labels'][dvalid.indeces]
+preds_sig = preds[labels_vec == 1]
+preds_bkg = preds[labels_vec == 0]
+hist_bins = np.linspace(0, 1.0, 100)
 
-# plt.clf()
-# plt.hist(preds_sig[:,1], bins=hist_bins, alpha=0.5, label='Signal')
-# plt.hist(preds_bkg[:,1], bins=hist_bins, alpha=0.5, label='Background')
-# plt.legend()
-# plt.ylabel("Counts")
-# plt.xlabel("Model output")
-# plt.title("Model output over validation set")
-# plt.savefig('./plots/initial_output.png', dpi=300
-# )
+plt.clf()
+plt.hist(preds_sig, bins=hist_bins, alpha=0.5, label='Signal')
+plt.hist(preds_bkg, bins=hist_bins, alpha=0.5, label='Background')
+plt.legend()
+plt.ylabel("Counts")
+plt.xlabel("Model output")
+plt.title("Model output over validation set")
+plt.savefig('./plots/initial_output.png', dpi=300
+)
 
 ############################### Train model #################################
 
@@ -155,13 +155,13 @@ model = tf.keras.models.load_model(args.checkDir)
 preds = model.predict(dvalid, batch_size=args.batchSize)
 
 # Make a histogram of network output, separated into signal/background
-preds_sig = preds[labels_vec == 1,:]
-preds_bkg = preds[labels_vec == 0,:]
+preds_sig = preds[labels_vec == 1]
+preds_bkg = preds[labels_vec == 0]
 hist_bins = np.linspace(0, 1.0, 100)
 
 plt.clf()
-plt.hist(preds_sig[:,1], bins=hist_bins, alpha=0.5, label='Signal')
-plt.hist(preds_bkg[:,1], bins=hist_bins, alpha=0.5, label='Background')
+plt.hist(preds_sig, bins=hist_bins, alpha=0.5, label='Signal')
+plt.hist(preds_bkg, bins=hist_bins, alpha=0.5, label='Background')
 plt.legend()
 plt.ylabel("Counts")
 plt.xlabel("Model output")
@@ -169,8 +169,8 @@ plt.title("Model output over validation set")
 plt.savefig("./plots/final_output.png", dpi=300)
 
 # Get ROC curve and AUC
-fpr, tpr, thresholds = metrics.roc_curve(labels_vec, preds[:,1])
-auc = metrics.roc_auc_score(labels_vec, preds[:,1])
+fpr, tpr, thresholds = metrics.roc_curve(labels_vec, preds)
+auc = metrics.roc_auc_score(labels_vec, preds)
 fprinv = 1 / fpr
 
 # Find background rejection at tpr = 0.5, 0.8 working points

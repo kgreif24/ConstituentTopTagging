@@ -54,17 +54,17 @@ def build_model(net_type, sample_shape, arglist):
             model.add(tf.keras.layers.ReLU())
             model.add(tf.keras.layers.Dropout(arglist.dropout))
         model.add(tf.keras.layers.Dense(
-            2, 
+            1, 
             kernel_initializer='glorot_uniform', 
             kernel_regularizer=tf.keras.regularizers.l1(l1=0),
-            activation='softmax')
+            activation='sigmoid')
         )
 
         # Compile model
         model.compile(
             optimizer=tf.keras.optimizers.Adam(learning_rate=5e-4),
-            loss=tf.keras.losses.CategoricalCrossentropy(from_logits=False),
-            metrics=[tf.keras.metrics.CategoricalAccuracy(name='acc')]
+            loss=tf.keras.losses.BinaryCrossentropy(from_logits=False),
+            metrics=[tf.keras.metrics.BinaryAccuracy(name='acc')]
         )
 
         # Once model is built, print summary
@@ -83,9 +83,10 @@ def build_model(net_type, sample_shape, arglist):
             latent_dropout=0.0,
             F_dropouts=arglist.dropout,
             mask_val=0,
-            loss="categorical_crossentropy",
+            loss="binary_crossentropy",
             optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4),
-            output_act='softmax',
+            output_dim=1,
+            output_act='sigmoid',
             summary=True
         )
 
@@ -102,9 +103,10 @@ def build_model(net_type, sample_shape, arglist):
             latent_dropout=0.0,
             F_dropouts=arglist.dropout,
             mask_val=0,
-            loss="categorical_crossentropy",
+            loss="binary_crossentropy",
             optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4),
-            output_act="softmax",
+            output_dim=1,
+            output_act="sigmoid",
             summary=True
         )
 

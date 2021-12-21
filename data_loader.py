@@ -176,17 +176,20 @@ class DataLoader(Sequence):
                 batch_pt = self.file['constit'][batch_start:batch_stop,:,0]
 
             # Now load labels and weights the regular way
-            batch_labels = self.file['labels'][batch_start:batch_stop,:]
+            batch_labels = self.file['labels'][batch_start:batch_stop]
             batch_weights = self.file['weights'][batch_start:batch_stop]
 
         # Now we have model dependent reshapes
-        if 'dnn' in self.net_type:
+        if self.net_type == 'hldnn':
 
-            # Input shape for all dnn networks can be found from sample shape
-            input_shape = self.sample_shape
+            # For hldnn, we don't need to reshape
+            shaped_data = batch_data
 
-            # Now we do reshaping
-            shaped_data = batch_data.reshape((this_bs, input_shape))
+        elif self.net_type == 'dnn':
+
+            # For DNNs, we need to flatten out vectors of constituents
+            input_shape = (this_bs, np.prod(self.sample_shape))
+            shaped_data = batch_data[:,:self.max_constits].reshape(input_shape)
 
         elif self.net_type == 'efn':
 
@@ -202,9 +205,13 @@ class DataLoader(Sequence):
 
         elif self.net_type == 'resnet':
 
+            # Ignore self.max_constits in image based network data. That is use all of
+            # the constituents to form jet images, not just however many we feed to constituent
+            # networks.
+
             # For image based network, our data is a list of indeces. Will also
-            # need jet i.d. information for indexing pixels
-            jet_id = np.repeat(np.arange(0, this_bs, 1), self.max_constits, axis=0)
+            # need jet i.d. information for indexing pixels.
+            jet_id = np.repeat(np.arange(0, this_bs, 1), 200, axis=0)
 
             # Now flatten all index arrays and pt array
             jet_index = np.ravel(jet_id)
@@ -237,13 +244,14 @@ class FakeLoader(Sequence):
 if __name__ == '__main__':
 
     # Let's set up some simple testing code.
-    filepath = "./dataloc/train.h5"
+    filepath = "/data1/kgreif/train.h5"
 
-    dloader = DataLoader(filepath)
+    dloader = DataLoader(filepath, net_type='resnet')
 
     print(len(dloader))
     print(dloader.sample_shape)
 
+    # print([np.shape(arr) for arr in dloader[0][0]])
     print(np.shape(dloader[0][0]))
     print(np.shape(dloader[0][1]))
     print(np.shape(dloader[0][2]))
