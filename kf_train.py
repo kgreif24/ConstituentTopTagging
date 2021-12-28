@@ -72,7 +72,7 @@ filepath = "/pub/kgreif/samples/h5dat/train.h5"
 # Now build dhs and use them to plot all branches of interest
 print("Building data objects...")
 dtrain = DataLoader(filepath, batch_size=args.batchSize, net_type=args.type, num_folds=5, this_fold=args.fold, mode='train')
-dvalid = DataLoader(filepath, batch_size=args.batchSize, net_type=args.type, num_folds=5, this_fold=args.fold, valid='valid')
+dvalid = DataLoader(filepath, batch_size=args.batchSize, net_type=args.type, num_folds=5, this_fold=args.fold, mode='valid')
 
 ########################## Get Model ########################
 
