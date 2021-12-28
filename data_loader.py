@@ -7,9 +7,6 @@ tagger).
 
 In the future, look into chunked memory to further optimize training speed.
 
-As of now the number of constituents is set in to_hdf.py step. Could make 
-this into a keyword argument here if we ever want to vary number constituents.
-
 Further, shuffling is currently done by keras' fit function at batch level, 
 so jets within a batch will always stay the same. Could look at doing more
 fancy shuffling later if needed.
@@ -34,7 +31,7 @@ class DataLoader(Sequence):
     class.
     """
 
-    def __init__(self, file_path, batch_size=100, valid=False,
+    def __init__(self, file_path, batch_size=100, mode='train',
                  net_type='dnn', num_folds=5, this_fold=1):
         """ __init__ - Init function for this class. Will load in root file
         using uproot. As Sequence class has no specific init function, don't
@@ -44,7 +41,8 @@ class DataLoader(Sequence):
             file_path (string): Path to h5py file containing TTree
             batch_size (int): The number of jets in each batch, used to
             calculate length of the loader
-            valid (bool): If true, feed validation partition and not training
+            mode (string): Either train, valid, or test. Train gives everything but valid fold,
+            valid gives only the valid fold, and test gives the entire dataset.
             net_type (string): Specifies the model specific data preparation to use
             num_folds (int): The number of folds data is split into
             this_fold (int): The number of the fold to use, 1-num_folds
@@ -54,9 +52,9 @@ class DataLoader(Sequence):
         """
 
         # First we set some instance variables for later use
-        self.max_constits = 80 # Hardcoded for now, see file doc string
+        self.max_constits = 80 # Hardcoded for now
         self.batch_size = batch_size
-        self.valid = valid
+        self.mode = mode
         self.net_type = net_type
 
         # Load hdf5 file using h5py, braches will be loaded in get item function
@@ -74,24 +72,38 @@ class DataLoader(Sequence):
             self.sample_shape = (self.max_constits, self.file.attrs.get("num_cons"))
 
         # Decide train/valid split for the given fold. Generator will only
-        # return data from one of these partitions, depending on the to_fit flag.
+        # return data from one of these partitions, unless mode is set to train.
         indeces = np.arange(0, tot_events, 1)
         folds = np.array_split(indeces, num_folds)
-        valid_indeces = folds.pop(this_fold - 1)  # -1 to make this_fold an index
-        train_indeces = np.concatenate(folds)
 
-        # Instead of using these indeces for indexing h5py file every time (slow)
-        # lets only do this on the "seam" batch. Find location of seam in train_indeces
-        self.seam = valid_indeces[0]
+        # Mode of loader will determine how we handle spliting up indeces. First handle
+        # k-fold procedure for training and validation modes.
+        if not self.mode == 'test':
+            valid_indeces = folds.pop(this_fold - 1)  # -1 to make this_fold an index
+            train_indeces = np.concatenate(folds)
+
+            # Instead of using these indeces for indexing h5py file every time (slow)
+            # lets only do this on the "seam" batch. Find location of seam in train_indeces
+            self.seam = valid_indeces[0]
+
+        # For testing we don't need to do anything, except define a dummy value of seam
+        # to avoid error message. This is a bit messy, will clean up later if I remember.
+        else:
+            self.seam = 0
 
         # Now choose number of events and indeces based on whether we are doing
         # training or validation
-        if not self.valid:
+        if self.mode == 'train':
             self.indeces = train_indeces
             self.num_events = len(train_indeces)
-        else:
+        elif self.mode == 'valid':
             self.indeces = valid_indeces
             self.num_events = len(valid_indeces)
+        elif self.mode == 'test':
+            self.indeces = indeces
+            self.num_events = tot_events
+        else:
+            raise ValueError("Mode keyword argument must be train, test, or valid")
             
 
     def __len__(self):
@@ -141,10 +153,9 @@ class DataLoader(Sequence):
             data_key = 'constit'
 
         # We watch to use different indexing for the "seam" batch and all other batches
-        # Condition on this here. Note this will never happen for validation sequences
-        # since self.seam is the index of the first element in the train_indeces that "jumps"
-        # over validation data. This is either 0 or some number larger than the length of
-        # the validation sequence.
+        # Condition on this here. Note this condition should only trigger when mode is 
+        # training. Validation and testing sequences should never trigger the condition,
+        # so include an assertion to make sure this never happens.
         if start < self.seam and stop > self.seam:
 
             # Given this is true, we just index using a slice of the numpy array
@@ -157,7 +168,7 @@ class DataLoader(Sequence):
 
             # We also need to load labels and weights, since this conditional will only
             # occur if we are training
-            assert not self.valid
+            assert not self.mode == 'valid' or self.mode == 'test'
             batch_labels = self.file['labels'][batch_indeces]
             batch_weights = self.file['weights'][batch_indeces]
 
@@ -244,9 +255,9 @@ class FakeLoader(Sequence):
 if __name__ == '__main__':
 
     # Let's set up some simple testing code.
-    filepath = "/data1/kgreif/train.h5"
+    filepath = "./dataloc/train.h5"
 
-    dloader = DataLoader(filepath, net_type='resnet')
+    dloader = DataLoader(filepath, net_type='resnet', mode='valid')
 
     print(len(dloader))
     print(dloader.sample_shape)

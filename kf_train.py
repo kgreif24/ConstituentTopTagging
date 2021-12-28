@@ -67,12 +67,12 @@ args = parser.parse_args()
 ####################### Data Handling ######################
 
 # Data parameters
-filepath = "./dataloc/train.h5"
+filepath = "/pub/kgreif/samples/h5dat/train.h5"
 
 # Now build dhs and use them to plot all branches of interest
 print("Building data objects...")
-dtrain = DataLoader(filepath, batch_size=args.batchSize, net_type=args.type, num_folds=5, this_fold=2)
-dvalid = DataLoader(filepath, batch_size=args.batchSize, net_type=args.type, num_folds=5, this_fold=2, valid=True)
+dtrain = DataLoader(filepath, batch_size=args.batchSize, net_type=args.type, num_folds=5, this_fold=args.fold, mode='train')
+dvalid = DataLoader(filepath, batch_size=args.batchSize, net_type=args.type, num_folds=5, this_fold=args.fold, valid='valid')
 
 ########################## Get Model ########################
 
@@ -81,7 +81,7 @@ model = models.build_model(args.type, dtrain.sample_shape, args)
 ##################### Initial Evaluation ####################
 
 print("\nPre-train evaluation...")
-preds = model.predict(dvalid, batch_size=args.batchSize, verbose=1)
+preds = model.predict(dvalid, batch_size=args.batchSize, verbose=0)
 
 # Make a histogram of network output, separated into signal/background
 labels_vec = dvalid.file['labels'][dvalid.indeces]
@@ -104,7 +104,7 @@ plt.savefig('./plots/initial_output.png', dpi=300
 # Earlystopping callback
 earlystop_callback = tf.keras.callbacks.EarlyStopping(
     monitor='val_loss',
-    patience=50,
+    patience=20,
     mode='min'
 )
 
@@ -130,7 +130,7 @@ train_hist = model.fit(
     batch_size=args.batchSize,
     validation_data=dvalid,
     callbacks=[earlystop_callback, check_callback, tboard_callback],
-    verbose=1
+    verbose=2
 )
 
 # Plot losses
@@ -152,7 +152,7 @@ print("\nEvaluate best model...")
 model = tf.keras.models.load_model(args.checkDir)
 
 # Predict
-preds = model.predict(dvalid, batch_size=args.batchSize)
+preds = model.predict(dvalid, batch_size=args.batchSize, verbose=0)
 
 # Make a histogram of network output, separated into signal/background
 preds_sig = preds[labels_vec == 1]
