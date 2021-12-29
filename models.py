@@ -11,12 +11,11 @@ import energyflow as ef
 from energyflow.archs import EFN
 from classification_models.tfkeras import Classifiers
 import tensorflow as tf
-from keras_applications.resnext import ResNeXt50
 import sklearn.metrics as metrics
 import numpy as np
 
 
-def build_model(net_type, sample_shape, arglist):
+def build_model(net_type, sample_shape, arglist=None, summary=True):
     """ build_model - This function will build and return a keras model.
     All model hyperparameters are controlled by the net_type string and the
     arguments provided in arglist. When using, make sure that the arglist
@@ -28,6 +27,7 @@ def build_model(net_type, sample_shape, arglist):
             of inputs to the DNN models.
         arglist (obj) - The argument parser that contains all information for
             this training run
+        summary (bool) - If true, print a summary of the model
 
     Returns:
         (obj) - A keras model ready to be trained
@@ -45,8 +45,8 @@ def build_model(net_type, sample_shape, arglist):
             model.add(tf.keras.layers.BatchNormalization(axis=1))
         for layer in arglist.nodes:
             model.add(tf.keras.layers.Dense(
-                layer, 
-                kernel_initializer='glorot_uniform', 
+                layer,
+                kernel_initializer='glorot_uniform',
                 kernel_regularizer=tf.keras.regularizers.l1(l1=0))
             )
             if arglist.batchNorm:
@@ -54,8 +54,8 @@ def build_model(net_type, sample_shape, arglist):
             model.add(tf.keras.layers.ReLU())
             model.add(tf.keras.layers.Dropout(arglist.dropout))
         model.add(tf.keras.layers.Dense(
-            1, 
-            kernel_initializer='glorot_uniform', 
+            1,
+            kernel_initializer='glorot_uniform',
             kernel_regularizer=tf.keras.regularizers.l1(l1=0),
             activation='sigmoid')
         )
@@ -68,7 +68,8 @@ def build_model(net_type, sample_shape, arglist):
         )
 
         # Once model is built, print summary
-        model.summary()
+        if summary:
+            model.summary()
 
     elif net_type == 'efn':
 
@@ -87,7 +88,7 @@ def build_model(net_type, sample_shape, arglist):
             optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4),
             output_dim=1,
             output_act='sigmoid',
-            summary=True
+            summary=summary
         )
 
     elif net_type == 'pfn':
@@ -107,18 +108,21 @@ def build_model(net_type, sample_shape, arglist):
             optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4),
             output_dim=1,
             output_act="sigmoid",
-            summary=True
+            summary=summary
         )
 
     elif net_type == 'resnet':
 
         # Define ResNeXt model using functional API
-        input_tens = tf.keras.layers.Input(shape=(224, 224, 1))
-        resnext = ResNeXt50(input_tensor=input_tens, include_top=False, weights=None,
-                            backend=tf.keras.backend, layers=tf.keras.layers, models=tf.keras.models,
-                            utils=tf.keras.utils)
+        input_tens = tf.keras.layers.Input(shape=sample_shape)
+        ResNeXt50, preprocess_input = Classifiers.get('resnext50')
+        resnext = ResNeXt50(input_shape=sample_shape,
+                            input_tensor=input_tens,
+                            include_top=False,
+                            weights=None)
         max_pool = tf.keras.layers.GlobalAveragePooling2D(data_format='channels_last')(resnext.output)
-        top_layer = tf.keras.layers.Dense(2, activation='softmax')(max_pool)
+        dropout = tf.keras.layers.Dropout(0.5)(max_pool)
+        top_layer = tf.keras.layers.Dense(1, activation='sigmoid')(dropout)
         model = tf.keras.models.Model(inputs=input_tens, outputs=top_layer)
 
         # Compile model
@@ -128,7 +132,8 @@ def build_model(net_type, sample_shape, arglist):
             metrics=[tf.keras.metrics.CategoricalAccuracy(name='acc')]
         )
 
-        model.summary()
+        if summary:
+            model.summary()
 
     else:
         raise ValueError("Model type is not known!")
@@ -160,3 +165,16 @@ def log_model_output(epoch, logs):
         tf.summary.histogram('background', preds_bkg, step=epoch)
 
     gc.collect()
+
+
+# Some testing code to see if Resnet works properly
+if __name__ == '__main__':
+
+    # Just call build model function
+    model = build_model('resnet', (64, 64, 1), summary=True)
+
+    # Random forward pass
+    data = np.random.rand(100, 64, 64, 1)
+    output = model(data)
+    print(output[:10])
+    print(output.shape)
