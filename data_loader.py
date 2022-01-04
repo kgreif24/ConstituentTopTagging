@@ -68,6 +68,8 @@ class DataLoader(Sequence):
         # Now we need to find the sample shape, depends on net_type
         if 'hl' in self.net_type:
             self.sample_shape = (self.file.attrs.get("num_hl",))
+        elif self.net_type == 'resnet':
+            self.sample_shape = (64, 64, 1)
         else:
             self.sample_shape = (self.max_constits, self.file.attrs.get("num_cons"))
 
@@ -228,12 +230,13 @@ class DataLoader(Sequence):
             jet_index = np.ravel(jet_id)
             eta_index = np.ravel(batch_data[:,:,0])
             phi_index = np.ravel(batch_data[:,:,1])
-            # Expand dims on pt because we have channels dimension
-            cons_pt = np.expand_dims(np.ravel(batch_pt), axis=-1)
+            cons_pt = np.ravel(batch_pt)
 
-            # Build images, starting from a zero array and incrementing
-            shaped_data = np.zeros((this_bs, 224, 224, 1), dtype=np.float32)
-            shaped_data[jet_index, eta_index, phi_index, :] += cons_pt
+            # Build images, starting from a zero array and incrementing. Note
+            # we use phi as our row coordinate and index from the bottom of the array.
+            # This strange indexing makes jet images intuitive.
+            shaped_data = np.zeros((this_bs, 64, 64, 1), dtype=np.float32)
+            np.add.at(shaped_data, (jet_index, -1*phi_index, eta_index, 0), cons_pt)
             
         # Finally package everything into a tuple and return
         return shaped_data, batch_labels, batch_weights
@@ -241,28 +244,25 @@ class DataLoader(Sequence):
 class FakeLoader(Sequence):
 
     def __init__(self):
-        self.sample_shape = (80, 4)
+        self.sample_shape = (64, 64, 1)
 
     def __len__(self):
-        return 33600
+        return 129284
 
     def __getitem__(self, index):
-        labels_vec = np.ones(100, dtype=np.int8)
-        labels_cat = np.eye(2, dtype=np.float32)[labels_vec]
-        return (np.random.rand(100, 224, 224, 1), labels_cat)
+        labels_vec = np.random.randint(0, 1, size=(100,))
+        return (np.random.rand(100, 64, 64, 1), labels_vec)
 
 
 if __name__ == '__main__':
 
     # Let's set up some simple testing code.
-    filepath = "./dataloc/train.h5"
+    filepath = "./dataloc/train_m.h5"
 
     dloader = DataLoader(filepath, net_type='resnet', mode='valid')
 
-    print(len(dloader))
-    print(dloader.sample_shape)
+    print("Loader length:", len(dloader))
+    print("Sample shape:", dloader.sample_shape)
 
-    # print([np.shape(arr) for arr in dloader[0][0]])
-    print(np.shape(dloader[0][0]))
-    print(np.shape(dloader[0][1]))
-    print(np.shape(dloader[0][2]))
+    print(dloader[0][0].shape)
+    print(dloader[0][0][:10,32,32,0])

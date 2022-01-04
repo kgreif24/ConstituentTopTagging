@@ -47,7 +47,7 @@ def build_model(net_type, sample_shape, arglist=None, summary=True):
             model.add(tf.keras.layers.Dense(
                 layer,
                 kernel_initializer='glorot_uniform',
-                kernel_regularizer=tf.keras.regularizers.l1(l1=0))
+                kernel_regularizer=tf.keras.regularizers.l1(l1=1e-3))
             )
             if arglist.batchNorm:
                 model.add(tf.keras.layers.BatchNormalization(axis=1))
@@ -56,13 +56,13 @@ def build_model(net_type, sample_shape, arglist=None, summary=True):
         model.add(tf.keras.layers.Dense(
             1,
             kernel_initializer='glorot_uniform',
-            kernel_regularizer=tf.keras.regularizers.l1(l1=0),
+            kernel_regularizer=tf.keras.regularizers.l1(l1=1e-3),
             activation='sigmoid')
         )
 
         # Compile model
         model.compile(
-            optimizer=tf.keras.optimizers.Adam(learning_rate=5e-4),
+            optimizer=tf.keras.optimizers.Adam(learning_rate=5e-5),
             loss=tf.keras.losses.BinaryCrossentropy(from_logits=False),
             metrics=[tf.keras.metrics.BinaryAccuracy(name='acc')]
         )
@@ -128,12 +128,13 @@ def build_model(net_type, sample_shape, arglist=None, summary=True):
         # Compile model
         model.compile(
             optimizer=tf.keras.optimizers.Adam(learning_rate=5e-4),
-            loss=tf.keras.losses.CategoricalCrossentropy(from_logits=False),
-            metrics=[tf.keras.metrics.CategoricalAccuracy(name='acc')]
+            loss=tf.keras.losses.BinaryCrossentropy(from_logits=False),
+            metrics=[tf.keras.metrics.BinaryAccuracy(name='acc')]
         )
 
+        # Summary for this model is stupidly long, just print number of parameters
         if summary:
-            model.summary()
+            print("Model parameters:", model.count_params())
 
     else:
         raise ValueError("Model type is not known!")
