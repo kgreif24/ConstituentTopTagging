@@ -43,6 +43,12 @@ constit_branches = ['fjet_clus_pt', 'fjet_clus_eta',
 hl_branches = ['fjet_Tau1_wta', 'fjet_Tau2_wta', 'fjet_Tau3_wta', 'fjet_Tau4_wta',
                'fjet_Split12', 'fjet_Split23', 'fjet_ECF1', 'fjet_ECF2', 'fjet_ECF3', 
                'fjet_C2', 'fjet_D2', 'fjet_Qw', 'fjet_L2', 'fjet_L3', 'fjet_ThrustMaj']
+check_branches = ['fjet_truthJet_eta', 'fjet_truthJet_pt', 'fjet_numConstituents',
+                  'fjet_truth_dRmatched_particle_flavor', 'fjet_truth_dRmatched_particle_dR',
+                  'fjet_truthJet_dRmatched_particle_dR_top_W_matched', 'fjet_ungroomed_truthJet_m',
+                  'fjet_truthJet_ungroomedParent_GhostBHadronsFinalCount',
+                  'fjet_ungroomed_truthJet_Split23', 'fjet_ungroomed_truthJet_pt']
+hl_branches = hl_branches + check_branches
 images_branch = ['images']
 pt_branch = ['fjet_pt']
 label_branch = ['labels']
@@ -231,9 +237,13 @@ for num_source, ifile in enumerate(files):
         ##################### Images ####################
 
         # Use np.digitize to produce arrays that give the indeces of each constituent in the jet image
-        bins = np.linspace(-np.pi, np.pi, 224)
-        binned_eta = np.digitize(eta_pp, bins)
-        binned_phi = np.digitize(phi_pp, bins)
+        bins = np.linspace(-2, 2, 65)  # 65 array length because we want to drop overflow bins
+        binned_eta = np.digitize(eta_pp, bins) - 1 # Minus one to shift indexing such that 0th bin is [-2, ...)
+        binned_phi = np.digitize(phi_pp, bins) - 1 # As above
+        # Next need to handle overflow bins, just set them to 0 or 63 as appropriate
+        binned_eta = np.clip(binned_eta, 0, 63)
+        binned_phi = np.clip(binned_phi, 0, 63)
+        # Finally stack image data
         batch_images = np.stack((binned_eta, binned_phi), axis=-1)
 
         # Send images to batch_data
