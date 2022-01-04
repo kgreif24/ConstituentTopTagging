@@ -28,7 +28,7 @@ plt.style.use('~/mattyplotsalot/allpurpose.mplstyle')
 import colorcet as cc
 
 # Custom imports
-from data_handler import DataHandler
+from data_loader import DataLoader
 
 
 # If GPU is available, print message
@@ -64,113 +64,52 @@ net_name = args.names
 batch_size = args.batchSize
 
 # Data parameters
-filepath = "/pub/kgreif/samples/sample_1p5M_v7_test.root"
-constit_branches = ['fjet_sortClusNormByPt_pt', 'fjet_sortClusCenterRotFlip_eta',
-                  'fjet_sortClusCenterRot_phi', 'fjet_sortClusNormByPt_e']
-hl_branches = ['fjet_Tau1_wta', 'fjet_Tau2_wta', 'fjet_Tau3_wta', 'fjet_Tau4_wta', 
-               'fjet_Split12', 'fjet_Split23', 'fjet_ECF1', 'fjet_ECF2', 'fjet_ECF3', 
-               'fjet_C2', 'fjet_D2', 'fjet_Qw', 'fjet_L2', 'fjet_L3', 'fjet_ThrustMaj']
-extra_branches = ['fjet_pt']
-max_constits = args.maxConstits
+filepath = "/pub/kgreif/samples/h5dat/test.h5"
 
 ############################# Process Data ################################
 
 # Now build dhs and use them to plot all branches of interest
-print("Building data object...")
-constit_dh = DataHandler(filepath, "FlatSubstructureJetTree", constit_branches,
-                         extras=extra_branches, max_constits=max_constits)
-hl_dh = DataHandler(filepath, "FlatSubstructureJetTree", hl_branches,
-                    extras=extra_branches, max_constits=0)
-
-# Figure out sample shape
-constit_sample_shape = tuple([batch_size]) + constit_dh.sample_shape()
-hl_sample_shape = tuple([batch_size]) + hl_dh.sample_shape()
-
-# Now make np arrays out of the data
-print("\nBuilding data arrays...")
-constit_arrs = constit_dh.np_arrays()
-hl_arrs = hl_dh.np_arrays()
-
-# Delete dhs to save memory
-del constit_dh
-del hl_dh
-
-# Split data arrays common to all model types
-print("\nSplitting data arrays...")
-constit_data = constit_arrs[0]
-constit_labels = constit_arrs[1]
-constit_pt = constit_arrs[2]
-constit_events = len(constit_pt)
-hl_data = hl_arrs[0]
-hl_labels = hl_arrs[1]
-hl_pt = hl_arrs[2]
-hl_events = len(hl_pt)
-
-# Verify that there are no NaNs in data
-assert not np.any(np.isnan(constit_data))
-assert not np.any(np.isnan(hl_data))
+print("Building data objects...")
+loaders = []
+for ntype in args.type:
+    this_loader = DataLoader(filepath, net_type=ntype, mode='test')
+    loaders.append(this_loader)
 
 ############################# Evaluation Loop #############################
 
-for model_num, (file, type, name) in enumerate(zip(net_file, net_type, net_name)):
+for model_num, (file, type, name, dloader) in enumerate(zip(net_file, net_type, net_name, loaders)):
 
     # Load model
     print("\nLoading model ", name)
     model = tf.keras.models.load_model(file)
 
-    # Either way print summary
+    # Print summary
     model.summary()
-
-    # Process data depending on model type
-    if type == 'dnn':
-        input_shape = np.prod(constit_sample_shape[1:])
-        valid_data = constit_data.reshape((constit_events, input_shape))
-        valid_labels = constit_labels
-        valid_pt = constit_pt
-        num_events = constit_events 
-        print("Shape of validation data: ", np.shape(valid_data))
-    elif type == 'hldnn':
-        valid_data = hl_data
-        valid_labels = hl_labels
-        valid_pt = hl_pt
-        num_events = hl_events
-        print("Shape of validation data: ", np.shape(valid_data))
-    elif type == 'efn':
-        valid_data = [constit_data[:,:,0], constit_data[:,:,1:3]]
-        valid_labels = constit_labels
-        valid_pt = constit_pt
-        num_events = constit_events
-        print("Shape of validation data (features): ", len(valid_data))
-    elif type == 'pfn':
-        valid_data = constit_data
-        valid_labels = constit_labels
-        valid_pt = constit_pt
-        num_evens = constit_events
-        print("Shape of validation data:", np.shape(valid_data))
-    else:
-        raise ValueError("Model type not recognized!")
 
     # Evaluate model
     print("\nEvaluation for ", name)
-    preds = model.predict(valid_data, batch_size=batch_size)
+    preds = model.predict(dloader, batch_size=batch_size)
+    disc_preds = (preds > 0.5).astype(int)
 
     # Make a histogram of network output, separated into signal/background
-    preds_sig = preds[valid_labels[:,1] == 1]
-    preds_bkg = preds[valid_labels[:,1] == 0]
+    labels = dloader.file['labels'][:]
+    preds_sig = preds[labels == 1]
+    preds_bkg = preds[labels == 0]
     hist_bins = np.linspace(0, 1.0, 100)
 
     plt.figure(1)
-    plt.hist(preds_sig[:,1], bins=hist_bins, alpha=0.5, label='Signal')
-    plt.hist(preds_bkg[:,1], bins=hist_bins, alpha=0.5, label='Background')
+    plt.hist(preds_sig, bins=hist_bins, alpha=0.5, label='Signal')
+    plt.hist(preds_bkg, bins=hist_bins, alpha=0.5, label='Background')
     plt.legend()
     plt.ylabel("Counts")
     plt.xlabel("Model output")
     plt.savefig('./outfiles/' + name + '.png', dpi=300)
     plt.clf()
 
-    # Get total ROC curve and AUC
-    fpr, tpr, thresholds = metrics.roc_curve(valid_labels[:,1], preds[:,1])
-    auc = metrics.roc_auc_score(valid_labels[:,1], preds[:,1])
+    # Get total ROC curve, AUC and ACC
+    fpr, tpr, thresholds = metrics.roc_curve(labels, preds)
+    auc = metrics.roc_auc_score(labels, preds)
+    acc = metrics.accuracy_score(labels, disc_preds)
     fprinv = 1 / fpr
 
     # Plot inverse roc curve
@@ -188,27 +127,29 @@ for model_num, (file, type, name) in enumerate(zip(net_file, net_type, net_name)
     wp_p8 = np.argmax(tpr > 0.8)
 
     # Print information on total model performance
+    print("AUC score: ", auc)
+    print("ACC score: ", acc)
     print("Background rejection at 0.5 signal efficiency: ", fprinv[wp_p5])
     print("Background rejection at 0.8 signal efficiency: ", fprinv[wp_p8])
-    print("AUC score: ", auc)
 
     # Now we want to bin performance information into pt bins. Let's loop through
     # an array of bins. Note array defines bin edges so we want to go up to 
     # len - 1
+    pt = dloader.file['fjet_pt'][:]
     pt_bins = np.linspace(350000, 3150000, 15)
-    jet_indeces = np.arange(0, num_events, 1)
+    jet_indeces = np.arange(0, len(labels), 1)
     wp_50_array = np.zeros(len(pt_bins)-1)
     wp_80_array = np.zeros(len(pt_bins)-1)
 
     for i in range(len(pt_bins)-1):
         
         # Find indeces of predictions for jets in pt range
-        condition = np.logical_and(valid_pt > pt_bins[i], valid_pt < pt_bins[i+1])
+        condition = np.logical_and(pt > pt_bins[i], pt < pt_bins[i+1])
         bin_indeces = np.asarray(condition).nonzero()[0]
 
         # Now take a sub-sample of predictions within the pt bin
-        bin_preds = preds[bin_indeces,1]
-        bin_labels = valid_labels[bin_indeces,1]
+        bin_preds = preds[bin_indeces]
+        bin_labels = labels[bin_indeces]
 
         # Now we want to calculate background rejection at working points
         fpr, tpr, thresholds = metrics.roc_curve(bin_labels, bin_preds)
@@ -238,12 +179,12 @@ for model_num, (file, type, name) in enumerate(zip(net_file, net_type, net_name)
     for i in range(len(hand_pt_bins)-1):
 
         # Find indeces of predictions for jets in pt range
-        condition = np.logical_and(valid_pt > hand_pt_bins[i], valid_pt < hand_pt_bins[i+1])
+        condition = np.logical_and(pt > hand_pt_bins[i], pt < hand_pt_bins[i+1])
         bin_indeces = np.asarray(condition).nonzero()[0]
 
         # Take sub-sample of predictions within pt bin
-        bin_preds = preds[bin_indeces,1]
-        bin_labels = valid_labels[bin_indeces,1]
+        bin_preds = preds[bin_indeces]
+        bin_labels = labels[bin_indeces]
 
         # Split into sig/bkg
         bin_preds_sig = bin_preds[bin_labels==1]
