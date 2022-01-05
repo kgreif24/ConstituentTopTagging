@@ -1,39 +1,36 @@
 """ models.py - This script defines a function that builds various types
 of keras or energyflow models based on a passed in argument list. Meant to be
-used with kf_train.py script.
+used with kf_train.py script and ModelTrainer class.
 
 Author: Kevin Greif
 python3
-Last updated 10/13/21
+Last updated 1/4/22
 """
 
 import energyflow as ef
-from energyflow.archs import EFN
 from classification_models.tfkeras import Classifiers
 import tensorflow as tf
-import sklearn.metrics as metrics
 import numpy as np
 
 
-def build_model(net_type, sample_shape, arglist=None, summary=True):
+def build_model(setup, sample_shape, summary=True):
     """ build_model - This function will build and return a keras model.
-    All model hyperparameters are controlled by the net_type string and the
-    arguments provided in arglist. When using, make sure that the arglist
-    contains all of the proper information to build the model.
+    All model hyperparameters are controlled by the arguments provided in
+    arglist. When using, make sure that the arglist contains all of the proper
+    information to build the model.
 
     Arguments:
-        net_type (str) - A string that gives the type of model to build
-        sample_shape (tuple) - The shape of each jet, used to infer the shape
-            of inputs to the DNN models.
-        arglist (obj) - The argument parser that contains all information for
-            this training run
+        setup (dict) - The dictionary that contains all of the variables
+            necessary to build and compile the tensorflow model.
+        sample_shape (tuple) - The shape of each data point that will be fed
+            to the model.
         summary (bool) - If true, print a summary of the model
 
     Returns:
         (obj) - A keras model ready to be trained
     """
 
-    if 'dnn' in net_type:
+    if 'dnn' in setup['type']:
 
         # First infer input shape from sample shape
         input_shape = np.prod(sample_shape)
@@ -41,28 +38,28 @@ def build_model(net_type, sample_shape, arglist=None, summary=True):
         # Build model
         model = tf.keras.Sequential()
         model.add(tf.keras.Input(shape=(input_shape,)))
-        if arglist.batchNorm:
+        if setup['batchNorm']:
             model.add(tf.keras.layers.BatchNormalization(axis=1))
-        for layer in arglist.nodes:
+        for layer in setup['nodes']:
             model.add(tf.keras.layers.Dense(
                 layer,
                 kernel_initializer='glorot_uniform',
-                kernel_regularizer=tf.keras.regularizers.l1(l1=1e-3))
+                kernel_regularizer=tf.keras.regularizers.l1(l1=0))
             )
-            if arglist.batchNorm:
+            if setup['batchNorm']:
                 model.add(tf.keras.layers.BatchNormalization(axis=1))
             model.add(tf.keras.layers.ReLU())
-            model.add(tf.keras.layers.Dropout(arglist.dropout))
+            model.add(tf.keras.layers.Dropout(setup['dropout']))
         model.add(tf.keras.layers.Dense(
             1,
             kernel_initializer='glorot_uniform',
-            kernel_regularizer=tf.keras.regularizers.l1(l1=1e-3),
+            kernel_regularizer=tf.keras.regularizers.l1(l1=0),
             activation='sigmoid')
         )
 
         # Compile model
         model.compile(
-            optimizer=tf.keras.optimizers.Adam(learning_rate=5e-5),
+            optimizer=tf.keras.optimizers.Adam(learning_rate=setup['learningRate']),
             loss=tf.keras.losses.BinaryCrossentropy(from_logits=False),
             metrics=[tf.keras.metrics.BinaryAccuracy(name='acc')]
         )
@@ -75,17 +72,17 @@ def build_model(net_type, sample_shape, arglist=None, summary=True):
 
         model = ef.archs.EFN(
             input_dim=2,
-            Phi_sizes=tuple(arglist.phisizes),
-            F_sizes=tuple(arglist.fsizes),
+            Phi_sizes=tuple(setup['phisizes']),
+            F_sizes=tuple(setup['fsizes']),
             Phi_acts="relu",
             F_acts="relu",
             Phi_k_inits="glorot_normal",
             F_k_inits="glorot_normal",
             latent_dropout=0.0,
-            F_dropouts=arglist.dropout,
+            F_dropouts=setup['dropout'],
             mask_val=0,
             loss="binary_crossentropy",
-            optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4),
+            optimizer=tf.keras.optimizers.Adam(learning_rate=setup['learningRate']),
             output_dim=1,
             output_act='sigmoid',
             summary=summary
@@ -95,17 +92,17 @@ def build_model(net_type, sample_shape, arglist=None, summary=True):
 
         model = ef.archs.PFN(
             input_dim=4,
-            Phi_sizes=tuple(arglist.phisizes),
-            F_sizes=tuple(arglist.fsizes),
+            Phi_sizes=tuple(setup['phisizes']),
+            F_sizes=tuple(setup['fsizes']),
             Phi_acts="relu",
             F_acts="relu",
             Phi_k_inits="glorot_normal",
             F_k_inits="glorot_normal",
             latent_dropout=0.0,
-            F_dropouts=arglist.dropout,
+            F_dropouts=setup['dropout'],
             mask_val=0,
             loss="binary_crossentropy",
-            optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4),
+            optimizer=tf.keras.optimizers.Adam(learning_rate=setup['learningRate']),
             output_dim=1,
             output_act="sigmoid",
             summary=summary
@@ -127,7 +124,7 @@ def build_model(net_type, sample_shape, arglist=None, summary=True):
 
         # Compile model
         model.compile(
-            optimizer=tf.keras.optimizers.Adam(learning_rate=5e-4),
+            optimizer=tf.keras.optimizers.Adam(learning_rate=setup['learningRate']),
             loss=tf.keras.losses.BinaryCrossentropy(from_logits=False),
             metrics=[tf.keras.metrics.BinaryAccuracy(name='acc')]
         )
@@ -140,42 +137,3 @@ def build_model(net_type, sample_shape, arglist=None, summary=True):
         raise ValueError("Model type is not known!")
 
     return model
-
-
-########################## Train Functions ##########################
-
-# Here we'll define some utility function to be used in model training
-
-def log_model_output(epoch, logs):
-    """ log_model_output - This function is meant to be passed to a
-    keras Lambda callback class. It is not a pure function, and will
-    inherit its variables from the instance. It will plot
-    the model output over the validation set.
-    """
-
-    # Run model prediction over validation set
-    preds = model.predict(valid_data, batch_size=batch_size)
-
-    # Split model output into signal and background
-    preds_sig = preds[valid_labels[:,1] == 1, 1]
-    preds_bkg = preds[valid_labels[:,1] == 0, 1]
-
-    # Now log histograms to tensorboard
-    with file_writer.as_default():
-        tf.summary.histogram('signal', preds_sig, step=epoch)
-        tf.summary.histogram('background', preds_bkg, step=epoch)
-
-    gc.collect()
-
-
-# Some testing code to see if Resnet works properly
-if __name__ == '__main__':
-
-    # Just call build model function
-    model = build_model('resnet', (64, 64, 1), summary=True)
-
-    # Random forward pass
-    data = np.random.rand(100, 64, 64, 1)
-    output = model(data)
-    print(output[:10])
-    print(output.shape)
