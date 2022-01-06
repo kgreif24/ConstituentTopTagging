@@ -9,6 +9,8 @@ python3
 import sys, os
 import argparse
 
+import tensorflow as tf
+
 from model_trainer import ModelTrainer
 
 
@@ -51,12 +53,12 @@ args = parser.parse_args()
 setup = vars(args)
 
 # Define training data location
-file = '/pub/kgreif/samples/h5dat/train.h5'
+file = '/data0/kgreif/train.h5'
 
 # Create ModelTrainer instance
 mt = ModelTrainer(setup, file)
 
 # Run routine
 plots = './plots'
-checks = '/checkpoints'
+checks = './checkpoints'
 mt.routine(setup['numEpochs'], plots, checks)

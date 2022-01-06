@@ -42,7 +42,7 @@ class BaseTrainer:
         """
 
         # Set some arguments to instance variables
-        self.batchSize = setup_obj['batchSize']
+        self.batchSize = setup['batchSize']
 
         # Build data loaders for training and validation
         self.dtrain = DataLoader(
@@ -90,7 +90,7 @@ class BaseTrainer:
             batch_size=self.batchSize,
             validation_data=self.dvalid,
             callbacks=callbacks,
-            verbose=2
+            verbose=1
         )
 
         # Return train history
@@ -107,4 +107,4 @@ class BaseTrainer:
         (array) - The array of predictions over the validation set
         """
 
-        return self.model.predict(self.dvalid, self.batchSize, verbose=0)
+        return self.model.predict(self.dvalid, self.batchSize, verbose=1)

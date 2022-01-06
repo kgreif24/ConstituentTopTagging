@@ -10,6 +10,7 @@ python3
 
 import tensorflow as tf
 import sklearn.metrics as metrics
+import numpy as np
 
 import colorcet as cc
 import matplotlib
@@ -73,7 +74,7 @@ class ModelTrainer(BaseTrainer):
         plt.savefig(plotdir + "/loss.png", dpi=300)
 
         # Run evaluation routine
-        self.evaluate(checkdir, plotdir)
+        self.evaluation(checkdir, plotdir)
 
     def predict_plot(self, directory):
         """ predict_plot - This function calls the prediction method and also
@@ -91,7 +92,7 @@ class ModelTrainer(BaseTrainer):
         preds = self.prediction()
 
         # Make plot using dvalid's labels
-        labels_vec = dvalid.file['labels'][dvalid.indeces]
+        labels_vec = self.dvalid.file['labels'][self.dvalid.indeces]
         preds_sig = preds[labels_vec == 1]
         preds_bkg = preds[labels_vec == 0]
         hist_bins = np.linspace(0, 1.0, 100)
