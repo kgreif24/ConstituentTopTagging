@@ -59,4 +59,4 @@ mt = ModelTrainer(setup, file)
 # Run routine
 plots = './plots'
 checks = '/checkpoints'
-mt.routine(plots, checks)
+mt.routine(setup['numEpochs'], plots, checks)

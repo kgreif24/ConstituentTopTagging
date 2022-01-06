@@ -27,12 +27,13 @@ class ModelTrainer(BaseTrainer):
     # Add init function to make plotdir and checkdir instance variables in
     # future.
 
-    def routine(self, plotdir, checkdir, patience=20):
+    def routine(self, epochs, plotdir, checkdir, patience=20):
         """ routine - This function will execute a training routine that
         plots things like model output and loss, evaluates complex metrics,
         and takes care of early stopping and checkpointing.
 
         Arguments:
+        epochs (int) - The number of epochs to run training
         plotdir (string) - The directory in which to store plots
         checkdir (string) - The directory in which to store checkpoints
         patience (int) - The patience to use in the early stopping callback.
@@ -59,7 +60,7 @@ class ModelTrainer(BaseTrainer):
         )
 
         # Run training routine
-        train_hist = self.train([earlystop_callback, check_callback])
+        train_hist = self.train(epochs, [earlystop_callback, check_callback])
 
         # Plot losses
         plt.clf()
@@ -73,19 +74,6 @@ class ModelTrainer(BaseTrainer):
 
         # Run evaluation routine
         self.evaluate(checkdir, plotdir)
-
-    def prediction(self):
-        """ prediction - This function will simply run the predict method of
-        the model.
-
-        Arguments:
-        None
-
-        Returns:
-        (array) - The array of predictions over the validation set
-        """
-
-        return self.model.predict(self.dvalid, self.batchSize, verbose=0)
 
     def predict_plot(self, directory):
         """ predict_plot - This function calls the prediction method and also

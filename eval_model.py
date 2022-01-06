@@ -68,7 +68,7 @@ filepath = "/pub/kgreif/samples/h5dat/test.h5"
 
 ############################# Process Data ################################
 
-# Now build dhs and use them to plot all branches of interest
+# Now build data loaders. Will need one for each model
 print("Building data objects...")
 loaders = []
 for ntype in args.type:
@@ -133,7 +133,7 @@ for model_num, (file, type, name, dloader) in enumerate(zip(net_file, net_type, 
     print("Background rejection at 0.8 signal efficiency: ", fprinv[wp_p8])
 
     # Now we want to bin performance information into pt bins. Let's loop through
-    # an array of bins. Note array defines bin edges so we want to go up to 
+    # an array of bins. Note array defines bin edges so we want to go up to
     # len - 1
     pt = dloader.file['fjet_pt'][:]
     pt_bins = np.linspace(350000, 3150000, 15)
@@ -142,7 +142,7 @@ for model_num, (file, type, name, dloader) in enumerate(zip(net_file, net_type, 
     wp_80_array = np.zeros(len(pt_bins)-1)
 
     for i in range(len(pt_bins)-1):
-        
+
         # Find indeces of predictions for jets in pt range
         condition = np.logical_and(pt > pt_bins[i], pt < pt_bins[i+1])
         bin_indeces = np.asarray(condition).nonzero()[0]
@@ -189,7 +189,7 @@ for model_num, (file, type, name, dloader) in enumerate(zip(net_file, net_type, 
         # Split into sig/bkg
         bin_preds_sig = bin_preds[bin_labels==1]
         bin_preds_bkg = bin_preds[bin_labels==0]
-        
+
         # Make model output plot for this pt bin
         plt.figure(4)
         plt.hist(bin_preds_sig, bins=hist_bins, alpha=0.5, label='Signal')
@@ -201,7 +201,7 @@ for model_num, (file, type, name, dloader) in enumerate(zip(net_file, net_type, 
         plt.title(bin_label + " (TeV)")
         plt.savefig('./outfiles/' + name + '_bin' + str(i) + '.png', dpi=300)
         plt.clf()
-        
+
         # Now find roc curve in this pt bin
         fpr, tpr, thresholds = metrics.roc_curve(bin_labels, bin_preds)
         fprinv = 1 / fpr
@@ -219,7 +219,7 @@ for model_num, (file, type, name, dloader) in enumerate(zip(net_file, net_type, 
     plt.title(name)
     plt.savefig("./outfiles/" + name + "_binned_roc.png", dpi=300)
     plt.clf() # Make sure to clear figure for next model!
-        
+
 
 # Add finishing touches to inverse roc plot
 plt.figure(2)
