@@ -68,7 +68,7 @@ def build_model(setup, sample_shape, summary=True):
         if summary:
             model.summary()
 
-    elif net_type == 'efn':
+    elif setup['type'] == 'efn':
 
         model = ef.archs.EFN(
             input_dim=2,
@@ -88,7 +88,7 @@ def build_model(setup, sample_shape, summary=True):
             summary=summary
         )
 
-    elif net_type == 'pfn':
+    elif setup['type'] == 'pfn':
 
         model = ef.archs.PFN(
             input_dim=4,
@@ -108,7 +108,7 @@ def build_model(setup, sample_shape, summary=True):
             summary=summary
         )
 
-    elif net_type == 'resnet':
+    elif setup['type'] == 'resnet':
 
         # Define ResNeXt model using functional API
         input_tens = tf.keras.layers.Input(shape=sample_shape)
