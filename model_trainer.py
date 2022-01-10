@@ -28,7 +28,7 @@ class ModelTrainer(BaseTrainer):
     # Add init function to make plotdir and checkdir instance variables in
     # future.
 
-    def routine(self, epochs, plotdir, checkdir, patience=20):
+    def routine(self, epochs, plotdir, checkdir, patience=20, use_schedule=False):
         """ routine - This function will execute a training routine that
         plots things like model output and loss, evaluates complex metrics,
         and takes care of early stopping and checkpointing.
@@ -38,6 +38,7 @@ class ModelTrainer(BaseTrainer):
         plotdir (string) - The directory in which to store plots
         checkdir (string) - The directory in which to store checkpoints
         patience (int) - The patience to use in the early stopping callback.
+        schedule (bool) - If true, use lr scheduler using keras callback
 
         Returns:
         None
@@ -47,11 +48,26 @@ class ModelTrainer(BaseTrainer):
         self.predict_plot(plotdir)
 
         # Build callbacks to be used during training.
+        callbacks = []
+
+        # Learning rate scheduler is specific to resnet training
+        if use_schedule:
+            
+            def schedule(epoch, lr):
+                if epoch == 10 or epoch == 20:
+                    lr *= 0.1
+                    print("New learning rate:", lr)
+                return lr
+            
+            schedule_callback = tf.keras.callbacks.LearningRateScheduler(schedule)
+            callbacks.append(schedule_callback)
+        
         earlystop_callback = tf.keras.callbacks.EarlyStopping(
             monitor='val_loss',
             patience=patience,
             mode='min'
         )
+        callbacks.append(earlystop_callback)
 
         check_callback = tf.keras.callbacks.ModelCheckpoint(
             filepath=checkdir,
@@ -59,9 +75,10 @@ class ModelTrainer(BaseTrainer):
             mode='min',
             save_best_only=True
         )
+        callbacks.append(check_callback)
 
         # Run training routine
-        train_hist = self.train(epochs, [earlystop_callback, check_callback])
+        train_hist = self.train(epochs, callbacks)
 
         # Plot losses
         plt.clf()

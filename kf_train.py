@@ -42,6 +42,8 @@ parser.add_argument('-lr', '--learningRate', default=1e-4, type=float,
                     help='Initial learning rate to be used in training')
 parser.add_argument('--maxConstits', default=80, type=int,
                     help='Number of constituents to include per event')
+parser.add_argument('--schedule', action='store_true', default=False,
+                    help='If present, use the learning rate scheduler defined in model_trainer.py')
 parser.add_argument('--numFolds', default=5, type=int,
                     help='Number of folds used in training run')
 parser.add_argument('--fold', default=1, type=int,
@@ -61,4 +63,4 @@ mt = ModelTrainer(setup, file)
 # Run routine
 plots = './plots'
 checks = './checkpoints'
-mt.routine(setup['numEpochs'], plots, checks)
+mt.routine(setup['numEpochs'], plots, checks, use_schedule=args.schedule)
