@@ -7,7 +7,7 @@ python3
 Last updated 1/4/22
 """
 
-import energyflow as ef
+from energyflow.archs import EFN, PFN
 from classification_models.tfkeras import Classifiers
 import tensorflow as tf
 import numpy as np
@@ -70,7 +70,7 @@ def build_model(setup, sample_shape, summary=True):
 
     elif setup['type'] == 'efn':
 
-        model = ef.archs.EFN(
+        model = EFN(
             input_dim=2,
             Phi_sizes=tuple(setup['phisizes']),
             F_sizes=tuple(setup['fsizes']),
@@ -90,7 +90,7 @@ def build_model(setup, sample_shape, summary=True):
 
     elif setup['type'] == 'pfn':
 
-        model = ef.archs.PFN(
+        model = PFN(
             input_dim=4,
             Phi_sizes=tuple(setup['phisizes']),
             F_sizes=tuple(setup['fsizes']),
