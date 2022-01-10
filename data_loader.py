@@ -202,7 +202,7 @@ class DataLoader(Sequence):
 
             # For DNNs, we need to flatten out vectors of constituents
             input_shape = (this_bs, np.prod(self.sample_shape))
-            shaped_data = batch_data[:,:self.max_constits].reshape(input_shape)
+            shaped_data = batch_data[:,:self.max_constits,:].reshape(input_shape)
 
         elif self.net_type == 'efn':
 
