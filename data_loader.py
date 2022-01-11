@@ -1,19 +1,14 @@
-""" data_loader.py - This class will prepare data for input into models
-in much the same way as the data_handler class. The difference is that this
-class will return a keras data generator constructed with h5py's indexing.
+""" data_loader.py - This class will prepare data for input into models. It
+will return a keras data generator constructed with h5py's indexing.
 This will allow us to loop over an entire training dataset while only ever
-having a fraction of it loaded in memory (important for training image based
-tagger).
+having a fraction of it loaded in memory.
 
-In the future, look into chunked memory to further optimize training speed.
-
-Further, shuffling is currently done by keras' fit function at batch level, 
-so jets within a batch will always stay the same. Could look at doing more
-fancy shuffling later if needed.
+Further, shuffling is currently done by keras' fit function at batch level,
+so jets within a batch will always stay the same.
 
 Author: Kevin Greif
 python3
-Last updated 10/4/21
+Last updated 1/10/22
 """
 
 import h5py
@@ -31,8 +26,14 @@ class DataLoader(Sequence):
     class.
     """
 
-    def __init__(self, file_path, batch_size=100, mode='train',
-                 net_type='dnn', num_folds=5, this_fold=1):
+    def __init__(self,
+                 file_path,
+                 batch_size=100,
+                 mode='train',
+                 net_type='dnn',
+                 max_constits=80,
+                 num_folds=5,
+                 this_fold=1):
         """ __init__ - Init function for this class. Will load in root file
         using uproot. As Sequence class has no specific init function, don't
         need to worry about calling super().
@@ -44,6 +45,7 @@ class DataLoader(Sequence):
             mode (string): Either train, valid, or test. Train gives everything but valid fold,
             valid gives only the valid fold, and test gives the entire dataset.
             net_type (string): Specifies the model specific data preparation to use
+            max_constits (int): Number of constituents to include in constituent models
             num_folds (int): The number of folds data is split into
             this_fold (int): The number of the fold to use, 1-num_folds
 
@@ -52,7 +54,7 @@ class DataLoader(Sequence):
         """
 
         # First we set some instance variables for later use
-        self.max_constits = 80 # Hardcoded for now
+        self.max_constits = max_constits
         self.batch_size = batch_size
         self.mode = mode
         self.net_type = net_type
@@ -67,11 +69,17 @@ class DataLoader(Sequence):
 
         # Now we need to find the sample shape, depends on net_type
         if 'hl' in self.net_type:
-            self.sample_shape = (self.file.attrs.get("num_hl",))
+            self.sample_shape = self.file['hl'].shape[1:]
         elif self.net_type == 'resnet':
-            self.sample_shape = (64, 64, 1)
+            self.sample_shape = (64, 64, 1)  # Simply hard code image dims
+        elif self.net_type == 'dnn':
+            self.sample_shape = (self.max_constits * 4,)
+        elif self.net_type == 'efn':
+            self.sample_shape = (self.max_constits, 2)
+        elif self.net_type == 'pfn':
+            self.sample_shape = (self.max_constits, 4)
         else:
-            self.sample_shape = (self.max_constits, self.file.attrs.get("num_cons"))
+            raise ValueError("Model type not recognized!")
 
         # Decide train/valid split for the given fold. Generator will only
         # return data from one of these partitions, unless mode is set to train.
@@ -106,11 +114,11 @@ class DataLoader(Sequence):
             self.num_events = tot_events
         else:
             raise ValueError("Mode keyword argument must be train, test, or valid")
-            
+
 
     def __len__(self):
         """ __len__ - This function returns the number of batches in each epoch
-        given the size of the data and the batch size. Use remainder of data as 
+        given the size of the data and the batch size. Use remainder of data as
         partial batch.
 
         Arguments:
@@ -154,8 +162,8 @@ class DataLoader(Sequence):
         else:
             data_key = 'constit'
 
-        # We watch to use different indexing for the "seam" batch and all other batches
-        # Condition on this here. Note this condition should only trigger when mode is 
+        # We want to use different indexing for the "seam" batch and all other batches
+        # Condition on this here. Note this condition should only trigger when mode is
         # training. Validation and testing sequences should never trigger the condition,
         # so include an assertion to make sure this never happens.
         if start < self.seam and stop > self.seam:
@@ -237,7 +245,7 @@ class DataLoader(Sequence):
             # This strange indexing makes jet images intuitive.
             shaped_data = np.zeros((this_bs, 64, 64, 1), dtype=np.float32)
             np.add.at(shaped_data, (jet_index, -1*phi_index, eta_index, 0), cons_pt)
-            
+
         # Finally package everything into a tuple and return
         return shaped_data, batch_labels, batch_weights
 

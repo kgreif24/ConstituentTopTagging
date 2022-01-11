@@ -7,6 +7,8 @@ Last updated 1/4/22
 python3
 """
 
+import numpy as np
+
 from data_loader import DataLoader
 import models
 
@@ -44,13 +46,20 @@ class BaseTrainer:
         # Set some arguments to instance variables
         self.batchSize = setup['batchSize']
 
+        # Find fold to be used
+        if isinstance(setup['fold'], int):
+            fold = setup['fold']
+        else:
+            fold = np.random.randint(1, setup['numFolds'] + 1)
+
         # Build data loaders for training and validation
         self.dtrain = DataLoader(
             datafile,
             batch_size=self.batchSize,
             net_type=setup['type'],
+            max_constits=setup['maxConstits'],
             num_folds=setup['numFolds'],
-            this_fold=setup['fold'],
+            this_fold=fold,
             mode='train'
         )
 
@@ -58,8 +67,9 @@ class BaseTrainer:
             datafile,
             batch_size=self.batchSize,
             net_type=setup['type'],
+            max_constits=setup['maxConstits'],
             num_folds=setup['numFolds'],
-            this_fold=setup['fold'],
+            this_fold=fold,
             mode='valid'
         )
 
