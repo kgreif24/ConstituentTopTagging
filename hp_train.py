@@ -21,7 +21,7 @@ config = {
     "fold": None,
     "hidden_layers": tune.choice([2, 3, 4, 5]),
     "nodes_per_layer": tune.choice([10, 20, 40, 80]),
-    "lr": tune.loguniform(1e-5, 1e-2),
+    "learningRate": tune.loguniform(1e-5, 1e-2),
     "batchNorm": tune.choice([True, False]),
     "dropout": tune.uniform(0, 0.2),
     "l1reg": tune.loguniform(1e-5, 1e-2),
@@ -36,5 +36,6 @@ analysis = tune.run(
     metric='score',
     mode='min',
     num_samples=1,
-    stop={'training_iteration': 1}
+    stop={'training_iteration': 1},
+    resources_per_trial={'gpu': 1}
 )
