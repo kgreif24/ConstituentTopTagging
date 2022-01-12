@@ -12,6 +12,8 @@ from classification_models.tfkeras import Classifiers
 import tensorflow as tf
 import numpy as np
 
+from pnet.tf_keras_model import get_particle_net
+
 
 def build_model(setup, sample_shape, summary=True):
     """ build_model - This function will build and return a keras model.
@@ -132,6 +134,22 @@ def build_model(setup, sample_shape, summary=True):
         # Summary for this model is stupidly long, just print number of parameters
         if summary:
             print("Model parameters:", model.count_params())
+
+    elif setup['type'] == 'pnet':
+
+        # Get particle net model
+        shapes = {'points': (sample_shape[0],2), 'features': sample_shape, 'mask': (sample_shape[0],1)}
+        model = get_particle_net(1, shapes)
+
+        # Compile model
+        model.compile(
+            optimizer=tf.keras.optimizers.Adam(learning_rate=setup['learningRate']),
+            loss=tf.keras.losses.BinaryCrossentropy(from_logits=False),
+            metrics=[tf.keras.metrics.BinaryAccuracy(name='acc')]
+        )
+        
+        if summary:
+            model.summary()
 
     else:
         raise ValueError("Model type is not known!")

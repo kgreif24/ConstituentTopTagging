@@ -78,6 +78,8 @@ class DataLoader(Sequence):
             self.sample_shape = (self.max_constits, 2)
         elif self.net_type == 'pfn':
             self.sample_shape = (self.max_constits, 4)
+        elif self.net_type == 'pnet':
+            self.sample_shape = (self.max_constits, 4)
         else:
             raise ValueError("Model type not recognized!")
 
@@ -245,6 +247,18 @@ class DataLoader(Sequence):
             # This strange indexing makes jet images intuitive.
             shaped_data = np.zeros((this_bs, 64, 64, 1), dtype=np.float32)
             np.add.at(shaped_data, (jet_index, -1*phi_index, eta_index, 0), cons_pt)
+
+        elif self.net_type == 'pnet':
+
+            # pnet expects a dictionary containing points, features, and a mask.
+            # Points will be eta,phi information stacked along constituent axis
+            # Features will be (pT, eta, phi, E) information as passed to PFN
+            # Mask will be pT information. Use this to allow code to process
+            # variable length inputs.
+            shaped_data = {}
+            shaped_data['points'] = batch_data[:,:self.max_constits,1:3]
+            shaped_data['features'] = batch_data[:,:self.max_constits,:]
+            shaped_data['mask'] = batch_data[:,:self.max_constits,0]  # pT
 
         # Finally package everything into a tuple and return
         return shaped_data, batch_labels, batch_weights
