@@ -211,7 +211,7 @@ class DataLoader(Sequence):
         elif self.net_type == 'dnn':
 
             # For DNNs, we need to flatten out vectors of constituents
-            input_shape = (this_bs, np.prod(self.sample_shape))
+            input_shape = (this_bs,) + self.sample_shape
             shaped_data = batch_data[:,:self.max_constits,:].reshape(input_shape)
 
         elif self.net_type == 'efn':
@@ -279,12 +279,15 @@ class FakeLoader(Sequence):
 if __name__ == '__main__':
 
     # Let's set up some simple testing code.
-    filepath = "./dataloc/train_m.h5"
+    filepath = "/pub/kgreif/samples/h5dat/train.h5"
 
-    dloader = DataLoader(filepath, net_type='resnet', mode='valid')
+    dloader = DataLoader(filepath, net_type='dnn', mode='train')
 
     print("Loader length:", len(dloader))
     print("Sample shape:", dloader.sample_shape)
 
-    print(dloader[0][0].shape)
-    print(dloader[0][0][:10,32,32,0])
+    start = time.time()
+    input, labels, weights = dloader[0]
+    shape = (100,) + dloader.sample_shape
+    input = input.reshape(shape)
+    print("Time for loading a single batch:", time.time() - start)

@@ -46,7 +46,7 @@ parser.add_argument('--schedule', action='store_true', default=False,
                     help='If present, use the learning rate scheduler defined in model_trainer.py')
 parser.add_argument('--numFolds', default=5, type=int,
                     help='Number of folds used in training run')
-parser.add_argument('--fold', default=1, type=int,
+parser.add_argument('--fold', default=None, type=int,
                     help='The fold being used in this particular job')
 args = parser.parse_args()
 
@@ -55,7 +55,7 @@ args = parser.parse_args()
 setup = vars(args)
 
 # Define training data location
-file = '/data0/kgreif/train.h5'
+file = '/pub/kgreif/samples/h5dat/train_mc_s.h5'
 
 # Create ModelTrainer instance
 mt = ModelTrainer(setup, file)
