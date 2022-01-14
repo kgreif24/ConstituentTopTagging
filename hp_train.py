@@ -14,7 +14,7 @@ from rt_objective import objective
 
 # Start by setting up search space
 config = {
-    "filepath": '/data0/kgreif/train.h5',
+    "filepath": '/pub/kgreif/samples/h5dat/train_mc_s.h5',
     "type": 'hldnn',
     "maxConstits": 80,
     "numFolds": 5,
@@ -25,7 +25,7 @@ config = {
     "batchNorm": tune.choice([True, False]),
     "dropout": tune.uniform(0, 0.2),
     "l1reg": tune.loguniform(1e-5, 1e-2),
-    "numEpochs": 80,
+    "numEpochs": 10,
     "batchSize": tune.choice([100, 200])
 }
 
@@ -33,9 +33,12 @@ config = {
 analysis = tune.run(
     objective,
     config=config,
+    name='hldnn',
     metric='score',
     mode='min',
     num_samples=1,
-    stop={'training_iteration': 1},
-    resources_per_trial={'gpu': 1}
+    stop={'training_iteration': 5},
+    resources_per_trial={'cpu': 1, 'gpu': 1},
+    local_dir='./tuning/hlDNN_tune',
+    verbose=1
 )

@@ -8,7 +8,7 @@ python 3
 
 
 from ray import tune
-from ray.tune.integration.keras import TuneReportCallback
+from ray.tune.integration.keras import TuneReportCheckpointCallback
 import numpy as np
 
 from base_trainer import BaseTrainer
@@ -16,7 +16,7 @@ from base_trainer import BaseTrainer
 def node_list(num_layers, num_nodes):
     return num_nodes * np.ones(num_layers, dtype=np.int32)
 
-def objective(config):
+def objective(config, checkpoint_dir=None):
 
     # Extract number of epochs for each iteration
     num_epochs = config['numEpochs']
@@ -28,7 +28,7 @@ def objective(config):
     trainer = BaseTrainer(config, config['filepath'])
 
     # Build tune callback
-    callback = TuneReportCallback({'score': 'val_loss'}, on='epoch_end')
+    callback = TuneReportCheckpointCallback({'score': 'val_loss'}, filename='model', on='epoch_end')
 
     # Run training
     hist = trainer.train(config['numEpochs'], [callback])
