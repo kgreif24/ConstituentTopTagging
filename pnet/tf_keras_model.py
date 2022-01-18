@@ -85,7 +85,7 @@ def _particle_net_base(points, features=None, mask=None, setting=None, name='par
     with tf.name_scope(name):
         if features is None:
             features = points
-
+            
         if mask is not None:
             mask = tf.cast(tf.not_equal(mask, 0), dtype='float32')  # 1 if valid
             coord_shift = tf.multiply(999., tf.cast(tf.equal(mask, 0), dtype='float32'))  # make non-valid positions to 99
@@ -109,7 +109,7 @@ def _particle_net_base(points, features=None, mask=None, setting=None, name='par
                 x = keras.layers.Dense(units, activation='relu')(x)
                 if drop_rate is not None and drop_rate > 0:
                     x = keras.layers.Dropout(drop_rate)(x)
-            out = keras.layers.Dense(setting.num_class, activation='softmax')(x)
+            out = keras.layers.Dense(setting.num_class, activation='sigmoid')(x)
             return out  # (N, num_classes)
         else:
             return pool

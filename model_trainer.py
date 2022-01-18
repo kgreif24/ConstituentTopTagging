@@ -45,7 +45,7 @@ class ModelTrainer(BaseTrainer):
         """
 
         # Evaluate model on validation set before training
-        self.predict_plot(plotdir)
+        # self.predict_plot(plotdir + "/initial_output.png")
 
         # Build callbacks to be used during training.
         callbacks = []
@@ -93,12 +93,12 @@ class ModelTrainer(BaseTrainer):
         # Run evaluation routine
         self.evaluation(checkdir, plotdir)
 
-    def predict_plot(self, directory):
+    def predict_plot(self, filename):
         """ predict_plot - This function calls the prediction method and also
-        generates plots of the model output that are stored in directory.
+        generates plots of the model output that are stored at the given filename.
 
         Arguments:
-        directory (string) - Location in which to store the plots
+        directory (string) - Name with which to save file
 
         Returns:
         (array), (array) - The array of predictions, labels over the validation
@@ -121,7 +121,7 @@ class ModelTrainer(BaseTrainer):
         plt.ylabel("Counts")
         plt.xlabel("Model output")
         plt.title("Model output over validation set")
-        plt.savefig(directory + '/initial_output.png', dpi=300)
+        plt.savefig(filename, dpi=300)
 
         return preds, labels_vec
 
@@ -142,7 +142,7 @@ class ModelTrainer(BaseTrainer):
         self.model = tf.keras.models.load_model(checkdir)
 
         # Run predict_plot function, calculate discrete predictions
-        preds, labels = self.predict_plot(plotdir)
+        preds, labels = self.predict_plot(plotdir + "/final_output.png")
         disc_preds = (preds > 0.5).astype(int)
 
         # Get ROC curve and AUC
