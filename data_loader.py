@@ -73,7 +73,7 @@ class DataLoader(Sequence):
         elif self.net_type == 'resnet':
             self.sample_shape = (64, 64, 1)  # Simply hard code image dims
         elif self.net_type == 'dnn':
-            self.sample_shape = (self.max_constits * 4,)
+            self.sample_shape = (self.max_constits, 4)
         elif self.net_type == 'efn':
             self.sample_shape = (self.max_constits, 2)
         elif self.net_type == 'pfn':
@@ -211,8 +211,8 @@ class DataLoader(Sequence):
         elif self.net_type == 'dnn':
 
             # For DNNs, we need to flatten out vectors of constituents
-            input_shape = (this_bs,) + self.sample_shape
-            shaped_data = batch_data[:,:self.max_constits,:].reshape(input_shape)
+            input_shape = (this_bs, np.prod(self.sample_shape))
+            shaped_data = batch_data[:,:self.max_constits].reshape(input_shape)
 
         elif self.net_type == 'efn':
 

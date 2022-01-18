@@ -77,6 +77,12 @@ class ModelTrainer(BaseTrainer):
         )
         callbacks.append(check_callback)
 
+        tboard_callback = tf.keras.callbacks.TensorBoard(
+            log_dir='../logs',
+            profile_batch='100, 200'
+        )
+        callbacks.append(tboard_callback)
+
         # Run training routine
         train_hist = self.train(epochs, callbacks)
 
