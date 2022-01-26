@@ -62,7 +62,7 @@ max_constits = 200
 n_files = 36
 
 # Setup cuts we want to make on jets
-common = "(abs(fjet_truthJet_eta)<2.0) & (fjet_truthJet_pt/1000.>350.) & (fjet_numConstituents > 3)"
+common = "(abs(fjet_truthJet_eta)<2.0) & (fjet_truthJet_pt/1000.>350.) & (fjet_numConstituents > 3) & (fjet_m > 1000./40)"
 signal = (" & (abs(fjet_truth_dRmatched_particle_flavor)==6) &"
           " (abs(fjet_truth_dRmatched_particle_dR)<0.75) &"
           " (abs(fjet_truthJet_dRmatched_particle_dR_top_W_matched)<0.75) &"
