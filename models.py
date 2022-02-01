@@ -10,6 +10,7 @@ Last updated 1/4/22
 from energyflow.archs import EFN, PFN
 from classification_models.tfkeras import Classifiers
 import tensorflow as tf
+import tensorflow_addons as tfa
 import numpy as np
 
 from pnet.tf_keras_model import get_particle_net
@@ -114,15 +115,12 @@ def build_model(setup, sample_shape, summary=True):
 
         # Define ResNeXt model using functional API
         input_tens = tf.keras.layers.Input(shape=sample_shape)
-        ResNeXt50, preprocess_input = Classifiers.get('resnext50')
-        resnext = ResNeXt50(input_shape=sample_shape,
-                            input_tensor=input_tens,
-                            include_top=False,
-                            weights=None)
-        max_pool = tf.keras.layers.GlobalAveragePooling2D(data_format='channels_last')(resnext.output)
-        dropout = tf.keras.layers.Dropout(0.5)(max_pool)
-        top_layer = tf.keras.layers.Dense(1, activation='sigmoid')(dropout)
-        model = tf.keras.models.Model(inputs=input_tens, outputs=top_layer)
+        ResNet50, preprocess_input = Classifiers.get('resnet50')
+        model = ResNet50(input_shape=sample_shape,
+                         input_tensor=input_tens,
+                         include_top=False,
+                         classes=1,
+                         weights=None)
 
         # Compile model
         model.compile(
@@ -134,6 +132,7 @@ def build_model(setup, sample_shape, summary=True):
         # Summary for this model is stupidly long, just print number of parameters
         if summary:
             print("Model parameters:", model.count_params())
+            print("Initial learning rate:", setup['learningRate'])
 
     elif setup['type'] == 'pnet':
 
@@ -143,7 +142,7 @@ def build_model(setup, sample_shape, summary=True):
 
         # Compile model
         model.compile(
-            optimizer=tf.keras.optimizers.Adam(learning_rate=setup['learningRate']),
+            optimizer=tfa.optimizers.AdamW(weight_decay=1e-4, learning_rate=setup['learningRate']),
             loss=tf.keras.losses.BinaryCrossentropy(from_logits=False),
             metrics=[tf.keras.metrics.BinaryAccuracy(name='acc')]
         )
