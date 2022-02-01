@@ -2,7 +2,7 @@
 training routine as set up in the ModelTrainer class.
 
 Author: Kevin Greif
-Last updated 1/4/22
+Last updated 1/14/22
 python3
 """
 
@@ -55,7 +55,7 @@ args = parser.parse_args()
 setup = vars(args)
 
 # Define training data location
-file = '/pub/kgreif/samples/h5dat/train_mc_s.h5'
+file = '/pub/kgreif/samples/h5dat/train.h5'
 
 # Create ModelTrainer instance
 mt = ModelTrainer(setup, file)

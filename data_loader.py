@@ -12,7 +12,6 @@ Last updated 1/10/22
 """
 
 import h5py
-import awkward as ak
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras.utils import Sequence

@@ -10,8 +10,6 @@
 #SBATCH -p free-gpu                               ## partition/queue name
 #SBATCH --gres=gpu:V100:1                         ## Use only 1 GPU
 #SBATCH --nodes=1                                 ## (-N) number of nodes to use
-#SBATCH --mem=30G                                 ## Request 30G of memory to fit data
-#SBATCH --ntasks-per-node=10
 
 #SBATCH --array=1-1
 
@@ -22,7 +20,7 @@
 #SBATCH --mail-user=kgreif@uci.edu                ## to this address
 
 # Set up directory tree before sbatch arguments
-homedir=$(pwd)
+homedir="/data/homezvol0/kgreif/toptag/ConstituentTopTagging"
 trdir="${homedir}/training/${SLURM_JOB_NAME}/run_${SLURM_ARRAY_TASK_ID}"
 logdir="${homedir}/training/${SLURM_JOB_NAME}/logs"
 rm -rf ${trdir}
@@ -45,7 +43,7 @@ echo "In directory ${trdir}"
 ls -lrth
 
 # Next build command to run python training script
-command="python ${homedir}/kf_train.py --numFolds 5 --fold ${SLURM_ARRAY_TASK_ID} --type hldnn --nodes 130 130 --numEpochs 80 --maxConstits 0"
+command="python ${homedir}/kf_train.py --numFolds 5 --fold ${SLURM_ARRAY_TASK_ID} --type dnn --nodes 90 90 --numEpochs 1"
 
 # Run command
 echo "================================"

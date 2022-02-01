@@ -8,6 +8,7 @@ python3
 """
 
 import numpy as np
+import tensorflow as tf
 
 from data_loader import DataLoader
 import models
@@ -44,7 +45,7 @@ class BaseTrainer:
         """
 
         # Set some arguments to instance variables
-        self.batchSize = setup['batchSize']
+        self.batchSize = int(setup['batchSize'])
 
         # Find fold to be used
         if isinstance(setup['fold'], int):

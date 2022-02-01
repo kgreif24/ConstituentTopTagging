@@ -46,7 +46,7 @@ def build_model(setup, sample_shape, summary=True):
             model.add(tf.keras.layers.Dense(
                 layer,
                 kernel_initializer='glorot_uniform',
-                kernel_regularizer=tf.keras.regularizers.l1(l1=0))
+                kernel_regularizer=tf.keras.regularizers.l1(l1=setup['l1reg']))
             )
             if setup['batchNorm']:
                 model.add(tf.keras.layers.BatchNormalization(axis=1))
@@ -55,7 +55,7 @@ def build_model(setup, sample_shape, summary=True):
         model.add(tf.keras.layers.Dense(
             1,
             kernel_initializer='glorot_uniform',
-            kernel_regularizer=tf.keras.regularizers.l1(l1=0),
+            kernel_regularizer=tf.keras.regularizers.l1(l1=setup['l1reg']),
             activation='sigmoid')
         )
 

@@ -14,7 +14,7 @@ import numpy as np
 from base_trainer import BaseTrainer
 
 def node_list(num_layers, num_nodes):
-    return num_nodes * np.ones(num_layers, dtype=np.int32)
+    return int(num_nodes) * np.ones(int(num_layers), dtype=np.int32)
 
 def objective(config, checkpoint_dir=None):
 
@@ -28,7 +28,7 @@ def objective(config, checkpoint_dir=None):
     trainer = BaseTrainer(config, config['filepath'])
 
     # Build tune callback
-    callback = TuneReportCheckpointCallback({'score': 'val_loss'}, filename='model', on='epoch_end')
+    callback = TuneReportCheckpointCallback({'score': 'val_loss', 'acc': 'val_acc'}, filename='model', on='epoch_end')
 
     # Run training
     hist = trainer.train(config['numEpochs'], [callback])
