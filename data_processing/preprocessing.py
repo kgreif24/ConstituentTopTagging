@@ -65,6 +65,50 @@ def energy_norm(jets, indeces, max_constits=200, **kwargs):
     return pt_sort, en_sort
 
 
+def log_norm(jets, name, indeces, max_constits=200, **kwargs):
+    """ log_norm - As opposed to energy norm, this preprocessing function will
+    return the logs of the normalized, and un-normalized pT or E. It is meant
+    to recreate the preprocessing used in the Particle Net paper.
+
+    Arguments:
+    jets (dict): Dictionary whose elements are awkard arrays giving the constituent
+    pt and energy. Usually a batch of a loop over a .root file using uproot.
+    name (str): Either 'fjet_clus_pt', or 'fjet_clus_E'. Function will apply preprocessing
+    to this element of the jets dict.
+    indeces (array): The indeces which will sort the constituents by INCREASING pt. Sort
+    will be reflected to sort by decreasing pt.
+    max_constits (int): The number of constituents to keep in our jets. Jets shorter 
+    than this will be zero padded, jets longer than this will be truncated.
+
+    Returns:
+    (array) - log(constits) values, in the shape (num_jets, max_constits)
+    (array) - log(constits / sum(constits)), in the same shape
+    """
+
+    # We must calculate log, lognorm, and order by decreasing
+    cons = jets[name]
+
+    # First take log and lognorm while still in ak array format
+    log_cons = np.log(cons)
+    sum_cons = np.sum(cons, axis=1)
+    norm_cons = cons / sum_cons[:,np.newaxis]
+    lognorm_cons = np.log(norm_cons)
+
+    # Zero pad and send to numpy
+    log_cons_zero = ak.pad_none(log_cons, max_constits, axis=1, clip=True)
+    log_cons_zero = ak.to_numpy(ak.fill_none(log_cons_zero, 0, axis=None))
+    lognorm_cons_zero = ak.pad_none(lognorm_cons, max_constits, axis=1, clip=True)
+    lognorm_cons_zero = ak.to_numpy(ak.fill_none(lognorm_cons_zero, 0, axis=None))
+
+    # Sort jets by decreasing pt
+    # Odd slicing is needed to invert pt ordering (decreasing vs increasing)
+    log_cons_sort = np.take_along_axis(log_cons_zero, indeces, axis=1)[:,::-1]
+    lognorm_cons_sort = np.take_along_axis(lognorm_cons_zero, indeces, axis=1)[:,::-1]
+
+    # Return results
+    return log_cons_sort, lognorm_cons_sort
+
+
 def simple_angular(jets, indeces, max_constits=200, **kwargs):
     """ simple_angular - This function will perform a simple preprocessing
     on the angular constituent information. It is the same preprocessing used

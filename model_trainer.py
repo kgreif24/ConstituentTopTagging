@@ -28,13 +28,31 @@ class ModelTrainer(BaseTrainer):
     # Add init function to make plotdir and checkdir instance variables in
     # future.
 
-    def routine(self, epochs, plotdir, checkdir, patience=20, use_schedule=False):
+    def step_schedule(self, epoch, lr):
+        if epoch == 9 or epoch == 19:
+            lr *= 0.1
+        print("New learning rate:", lr)
+        return float(lr)
+
+    def cycle_schedule(self, epoch, lr):
+        peak_lr = 3e-3
+        final_lr = 5e-7
+        ramp_length = 8
+        schedule = np.zeros(self.numEpochs)
+        schedule[0:ramp_length] = np.linspace(self.initial_lr, peak_lr, ramp_length)
+        schedule[ramp_length:2*ramp_length] = np.linspace(peak_lr, self.initial_lr, ramp_length)
+        schedule[2*ramp_length:2*ramp_length+4] = np.linspace(self.initial_lr, final_lr, 4)
+        schedule[2*ramp_length+4:] = 5e-7 * np.ones(self.numEpochs - (2*ramp_length+4))
+
+        print("New learning rate:", schedule[epoch])
+        return schedule[epoch]
+
+    def routine(self, plotdir, checkdir, patience=20, use_schedule=False):
         """ routine - This function will execute a training routine that
         plots things like model output and loss, evaluates complex metrics,
         and takes care of early stopping and checkpointing.
 
         Arguments:
-        epochs (int) - The number of epochs to run training
         plotdir (string) - The directory in which to store plots
         checkdir (string) - The directory in which to store checkpoints
         patience (int) - The patience to use in the early stopping callback.
@@ -45,23 +63,25 @@ class ModelTrainer(BaseTrainer):
         """
 
         # Evaluate model on validation set before training
-        # self.predict_plot(plotdir + "/initial_output.png")
+        self.predict_plot(plotdir + "/initial_output.png")
 
         # Build callbacks to be used during training.
         callbacks = []
 
-        # Learning rate scheduler is specific to resnet training
+        # Learning rate scheduler
         if use_schedule:
             
-            def schedule(epoch, lr):
-                if epoch == 10 or epoch == 20:
-                    lr *= 0.1
-                    print("New learning rate:", lr)
-                return lr
+            if use_schedule == 1:
+                schedule_func = self.step_schedule
+            elif use_schedule == 2:
+                schedule_func = self.cycle_schedule
+            else:
+                raise ValueError("Schedule number not recognized")
             
-            schedule_callback = tf.keras.callbacks.LearningRateScheduler(schedule)
+            schedule_callback = tf.keras.callbacks.LearningRateScheduler(schedule_func)
             callbacks.append(schedule_callback)
-        
+
+        # Early stopping
         earlystop_callback = tf.keras.callbacks.EarlyStopping(
             monitor='val_loss',
             patience=patience,
@@ -69,6 +89,7 @@ class ModelTrainer(BaseTrainer):
         )
         callbacks.append(earlystop_callback)
 
+        # Checkpointing
         check_callback = tf.keras.callbacks.ModelCheckpoint(
             filepath=checkdir,
             monitor='val_loss',
@@ -77,14 +98,14 @@ class ModelTrainer(BaseTrainer):
         )
         callbacks.append(check_callback)
 
+        # Tensorboard
         tboard_callback = tf.keras.callbacks.TensorBoard(
-            log_dir='../logs',
-            profile_batch='100, 200'
+            log_dir='../logs'
         )
         callbacks.append(tboard_callback)
 
         # Run training routine
-        train_hist = self.train(epochs, callbacks)
+        train_hist = self.train(callbacks)
 
         # Plot losses
         plt.clf()

@@ -46,6 +46,8 @@ class BaseTrainer:
 
         # Set some arguments to instance variables
         self.batchSize = int(setup['batchSize'])
+        self.initial_lr = setup['learningRate']
+        self.numEpochs = setup['numEpochs']
 
         # Find fold to be used
         if isinstance(setup['fold'], int):
@@ -81,12 +83,11 @@ class BaseTrainer:
             self.model = tf.keras.models.load_model(file)
 
 
-    def train(self, numEpochs, callbacks):
+    def train(self, callbacks):
         """ train - This function simply runs the training routine as set up
         in the init function. It returns the entire training history object.
 
         Arguments:
-        numEpochs (int) - The number of epochs to train for.
         callbacks (list) - A list of callback objects to pass to the fit
             routine.
 
@@ -97,7 +98,7 @@ class BaseTrainer:
         # Simply call the keras fit function on the model.
         train_hist = self.model.fit(
             self.dtrain,
-            epochs=numEpochs,
+            epochs=self.numEpochs,
             batch_size=self.batchSize,
             validation_data=self.dvalid,
             callbacks=callbacks,
