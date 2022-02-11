@@ -31,4 +31,4 @@ def objective(config, checkpoint_dir=None):
     callback = TuneReportCheckpointCallback({'score': 'val_loss', 'acc': 'val_acc'}, filename='model', on='epoch_end')
 
     # Run training
-    hist = trainer.train(config['numEpochs'], [callback])
+    hist = trainer.train([callback])

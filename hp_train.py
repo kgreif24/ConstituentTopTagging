@@ -19,7 +19,7 @@ max_epochs = 40
 
 # Start by setting up search space
 config = {
-    "filepath": '/pub/kgreif/samples/h5dat/train.h5',
+    "filepath": '/pub/kgreif/samples/h5dat/train_mc_m.h5',
     "type": 'hldnn',
     "maxConstits": 80,
     "numFolds": 5,
