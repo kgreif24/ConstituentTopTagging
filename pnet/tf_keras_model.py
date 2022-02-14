@@ -77,10 +77,12 @@ def edge_conv(points, features, num_points, K, channels, with_bn=True, activatio
             return sc + fts
 
 
-def _particle_net_base(points, features=None, mask=None, setting=None, name='particle_net'):
+def _particle_net_base(points, features=None, mask=None, jet_pt=None, setting=None, name='particle_net'):
     # points : (N, P, C_coord)
     # features:  (N, P, C_features), optional
-    # mask: (N, P, 1), optinal
+    # mask: (N, P, 1), optional
+    # jet_pt: (N, 1), optional
+    print(jet_pt)
 
     with tf.name_scope(name):
         if features is None:
@@ -104,8 +106,13 @@ def _particle_net_base(points, features=None, mask=None, setting=None, name='par
 
         if setting.fc_params is not None:
             x = pool
+
+            # kgreif edit: if we are considering jet pt, append it to x here
+            if jet_pt is not None:
+                x = tf.concat([pool, jet_pt], 1)  # (N, C+1)
+                
             for layer_idx, layer_param in enumerate(setting.fc_params):
-                units, drop_rate = layer_param
+                units, drop_rate = layer_param                    
                 x = keras.layers.Dense(units, activation='relu')(x)
                 if drop_rate is not None and drop_rate > 0:
                     x = keras.layers.Dropout(drop_rate)(x)
@@ -146,9 +153,11 @@ def get_particle_net(num_classes, input_shapes):
     points = keras.Input(name='points', shape=input_shapes['points'])
     features = keras.Input(name='features', shape=input_shapes['features']) if 'features' in input_shapes else None
     mask = keras.Input(name='mask', shape=input_shapes['mask']) if 'mask' in input_shapes else None
-    outputs = _particle_net_base(points, features, mask, setting, name='ParticleNet')
+    # kgreif edit: Added jet pt as a possible input
+    jet_pt = keras.Input(name='jet_pt', shape=input_shapes['jet_pt']) if 'jet_pt' in input_shapes else None
+    outputs = _particle_net_base(points, features, mask, jet_pt, setting, name='ParticleNet')
 
-    return keras.Model(inputs=[points, features, mask], outputs=outputs, name='ParticleNet')
+    return keras.Model(inputs=[points, features, mask, jet_pt], outputs=outputs, name='ParticleNet')
 
 
 def get_particle_net_lite(num_classes, input_shapes):

@@ -137,7 +137,7 @@ def build_model(setup, sample_shape, summary=True):
     elif setup['type'] == 'pnet':
 
         # Get particle net model
-        shapes = {'points': (sample_shape[0],2), 'features': sample_shape, 'mask': (sample_shape[0],1)}
+        shapes = {'points': (sample_shape[0],2), 'features': sample_shape, 'mask': (sample_shape[0],1), 'jet_pt': (1,)}
         model = get_particle_net(1, shapes)
 
         # Compile model

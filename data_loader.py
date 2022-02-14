@@ -178,6 +178,10 @@ class DataLoader(Sequence):
             if self.net_type == 'resnet':
                 batch_pt = self.file['constit'][batch_indeces,:,0]
 
+            # Particle Net needs jet pt data
+            if self.net_type == 'pnet':
+                batch_jetpt = self.file['fjet_pt'][batch_indeces]
+
             # We also need to load labels and weights, since this conditional will only
             # occur if we are training
             assert not self.mode == 'valid' or self.mode == 'test'
@@ -197,6 +201,10 @@ class DataLoader(Sequence):
             # Again, resnet needs pt data for pixel intensity
             if self.net_type == 'resnet':
                 batch_pt = self.file['constit'][batch_start:batch_stop,:,0]
+
+            # Again, particle net needs jet pt data
+            if self.net_type == 'pnet':
+                batch_jetpt = self.file['fjet_pt'][batch_start:batch_stop]
 
             # Now load labels and weights the regular way
             batch_labels = self.file['labels'][batch_start:batch_stop]
@@ -255,10 +263,12 @@ class DataLoader(Sequence):
             # Features will be (pT, eta, phi, E) information as passed to PFN
             # Mask will be pT information. Use this to allow code to process
             # variable length inputs.
+            # Will also input jet pt. This will just be the jet pt, not too hard
             shaped_data = {}
             shaped_data['points'] = batch_data[:,:self.max_constits,1:3]
             shaped_data['features'] = batch_data[:,:self.max_constits,:]
-            shaped_data['mask'] = batch_data[:,:self.max_constits,0]  # pT
+            shaped_data['mask'] = batch_data[:,:self.max_constits,0]  # constit pT
+            shaped_data['jet_pt'] = np.expand_dims(batch_jetpt, axis=1) / 1e6
 
         # Finally package everything into a tuple and return
         return shaped_data, batch_labels, batch_weights
