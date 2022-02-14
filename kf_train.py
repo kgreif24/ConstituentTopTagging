@@ -34,6 +34,8 @@ parser.add_argument('--batchNorm', action='store_true', default=False,
                     help='If present, use batch norm in DNN based models')
 parser.add_argument('--dropout', default=0., type=float,
                     help='The dropout rate to use in DNN layers and in EFN/PFN F network')
+parser.add_argument('--l1reg', default=0., type=float,
+                    help='The amount of L1 regularization to apply to DNN based networks')
 parser.add_argument('-N', '--numEpochs', default=100, type=int,
                     help='Number of epochs')
 parser.add_argument('-b', '--batchSize', default=100, type=int,
@@ -55,7 +57,7 @@ args = parser.parse_args()
 setup = vars(args)
 
 # Define training data location
-file = '/pub/kgreif/samples/h5dat/train.h5'
+file = '/data0/kgreif/train_mc_m.h5'
 
 # Create ModelTrainer instance
 mt = ModelTrainer(setup, file)
@@ -63,4 +65,4 @@ mt = ModelTrainer(setup, file)
 # Run routine
 plots = './plots'
 checks = './checkpoints'
-mt.routine(plots, checks, patience=10, use_schedule=args.schedule)
+mt.routine(plots, checks, patience=24, use_schedule=args.schedule)
