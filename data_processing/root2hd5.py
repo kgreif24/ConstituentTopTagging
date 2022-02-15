@@ -43,12 +43,6 @@ constit_branches = ['fjet_clus_pt', 'fjet_clus_eta',
 hl_branches = ['fjet_Tau1_wta', 'fjet_Tau2_wta', 'fjet_Tau3_wta', 'fjet_Tau4_wta',
                'fjet_Split12', 'fjet_Split23', 'fjet_ECF1', 'fjet_ECF2', 'fjet_ECF3', 
                'fjet_C2', 'fjet_D2', 'fjet_Qw', 'fjet_L2', 'fjet_L3', 'fjet_ThrustMaj']
-check_branches = ['fjet_truthJet_eta', 'fjet_truthJet_pt', 'fjet_numConstituents',
-                  'fjet_truth_dRmatched_particle_flavor', 'fjet_truth_dRmatched_particle_dR',
-                  'fjet_truthJet_dRmatched_particle_dR_top_W_matched', 'fjet_ungroomed_truthJet_m',
-                  'fjet_truthJet_ungroomedParent_GhostBHadronsFinalCount',
-                  'fjet_ungroomed_truthJet_Split23', 'fjet_ungroomed_truthJet_pt']
-hl_branches = hl_branches + check_branches
 images_branch = ['images']
 pt_branch = ['fjet_pt']
 label_branch = ['labels']
@@ -62,7 +56,7 @@ max_constits = 200
 n_files = 36
 
 # Setup cuts we want to make on jets
-common = "(abs(fjet_truthJet_eta)<2.0) & (fjet_truthJet_pt/1000.>350.) & (fjet_numConstituents > 3) & (fjet_m > 1000./40)"
+common = "(abs(fjet_truthJet_eta)<2.0) & (fjet_truthJet_pt/1000.>350.) & (fjet_numConstituents > 3) & (fjet_m/1000.>40.)"
 signal = (" & (abs(fjet_truth_dRmatched_particle_flavor)==6) &"
           " (abs(fjet_truth_dRmatched_particle_dR)<0.75) &"
           " (abs(fjet_truthJet_dRmatched_particle_dR_top_W_matched)<0.75) &"

@@ -26,7 +26,7 @@ def find_raw_len(filename):
     """
 
     events = uproot.open(filename)
-    return ak.num(events['fjet_pt'], axis=0)
+    return ak.num(events['fatjet_pt'], axis=0)
 
 def find_cut_len(filename, cuts):
     """ find_cut_len - Take in a path to a .root file and returns the number of 
@@ -41,8 +41,8 @@ def find_cut_len(filename, cuts):
     """
 
     events = uproot.open(filename)
-    arrays = events.arrays("fjet_pt", cut=cuts)
-    return ak.num(arrays['fjet_pt'], axis=0)
+    arrays = events.arrays("fatjet_pt", cut=cuts)
+    return ak.num(arrays['fatjet_pt'], axis=0)
 
 def find_h5_len(filename):
     """ find_h5_len - Take in a path to a .h5 file and returns the length of 
@@ -313,3 +313,98 @@ def calc_standards(file):
         stddevs_list.append(stddev)
 
     return means_list, stddevs_list
+
+
+def common_cuts(batch):
+    """ common_cuts - This function will take in a batch of data (almost always as loaded)
+    by uproot.iterate and apply the common cuts for Rel22. For when data format does not
+    allow uproot to do this for us.
+
+    Arguments:
+    batch (obj or dict) - The batch, where branches are accessible by string names
+
+    Returns:
+    (array) - A boolean array of len branch.shape[0]. If True, jet passes common cuts
+    """
+
+    # Assemble boolean arrays
+    cuts = []
+    cuts.append(abs(batch['fatjet_truth_eta']) < 2.0)
+    cuts.append(batch['fatjet_truth_pt'] / 1000. > 350.)
+    cuts.append(batch['fatjet_numConstituents'] > 3)
+    cuts.append(batch['fatjet_m'] / 1000. > 40.)
+
+    # Going to also include cuts on hl var exit codes here
+    cuts.append(batch['fatjet_Tau1_wta'] != -999)
+    cuts.append(batch['fatjet_Tau2_wta'] != -999)
+    cuts.append(batch['fatjet_Tau3_wta'] != -999)
+    cuts.append(batch['fatjet_Tau4_wta'] != -999)
+    cuts.append(batch['fatjet_Split12'] != -999)
+    cuts.append(batch['fatjet_Split23'] != -999)
+    cuts.append(batch['fatjet_ECF1'] != -999)
+    cuts.append(batch['fatjet_ECF2'] != -999)
+    cuts.append(batch['fatjet_ECF3'] != -999)
+    cuts.append(batch['fatjet_C2'] != -999)
+    cuts.append(batch['fatjet_D2'] != -999)
+    cuts.append(batch['fatjet_Qw'] != -999)
+    cuts.append(batch['fatjet_L2'] != -999)
+    cuts.append(batch['fatjet_L3'] != -999)
+    cuts.append(batch['fatjet_ThrustMaj'] != -999)
+
+    # Take and of all cuts
+    total_cuts = np.logical_and.reduce(cuts)
+
+    return total_cuts
+
+
+def signal_cuts(batch):
+    """ signal_cuts - Identical to the above common cuts, but applies the rel 22.0 
+    signal cuts.
+
+    Arguments:
+    batch (obj or dict) - The batch data from which to compute cuts
+
+    Returns:
+    (array) - Boolean array representing total cuts
+    """
+
+    # Assemble boolean arrays
+    cuts = []
+    cuts.append(abs(batch['fatjet_truth_dRmatched_particle_flavor']) == 6)
+    cuts.append(abs(batch['fatjet_truth_dRmatched_particle_dR']) < 0.75)
+    cuts.append(abs(batch['fatjet_truth_dRmatched_particle_dR_top_W_matched']) < 0.75)
+    cuts.append(batch['fatjet_ungroomed_truth_m'] / 1000. > 140.)
+    cuts.append(batch['fatjet_truth_ungroomedParent_GhostBHadronsFinalCount'] >= 1)
+    cuts.append(batch['fatjet_ungroomed_truth_Split23'] / 1000. > np.exp(3.3-6.98e-4*batch['fatjet_ungroomed_truth_pt']/1000.))
+
+    # Take and of all cuts
+    total_cuts = np.logical_and.reduce(cuts)
+
+    return total_cuts
+
+
+def count_sig(raw_batch, sig=False):
+    """ This function will count the number of jets in a raw batch (loaded from 
+    nTuple before flattening) after applying signal or common cuts.
+
+    Arguments:
+    raw_batch (obj or dict) - Usually an object from file.arrays call containing data
+    sig (bool) - If true use signal cuts, if false use only common cuts
+
+    Returns:
+    (int) - The number of jets in raw_batch that will pass cut
+    """
+
+    # Start by flattening batch
+    flat_batch = {key: ak.flatten(raw_batch[key], axis=1) for key in raw_batch.fields}
+
+    # Then pass to cutting functions
+    cuts = common_cuts(flat_batch)
+    if sig:
+        sig_cuts = signal_cuts(flat_batch)
+        cuts = np.logical_and(cuts, sig_cuts)
+
+    # Return the number of trues in boolean array
+    return np.count_nonzero(cuts)
+
+    
