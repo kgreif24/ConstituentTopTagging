@@ -1,9 +1,9 @@
-""" eval_model.py - This script will evaluate a pretrained network of type
-hlDNN, DNN, EFN, or PFN. It will make use of the DataHandler class to quickly
-generate np arrays of the jet data.
+""" plot_eval.py - This script will evaluate the predictions of a network
+saved as a .npz file. The file must contain the model predictions, the
+predictions discretized with a cut off of 0.5, the labels, and the jet pT
 
 Author: Kevin Greif
-Last updated 10/11/21
+Last updated 2/15/22
 python3
 """
 
@@ -27,9 +27,6 @@ import matplotlib.pyplot as plt
 plt.style.use('~/mattyplotsalot/allpurpose.mplstyle')
 import colorcet as cc
 
-# Custom imports
-from data_loader import DataLoader
-
 
 # If GPU is available, print message
 print("\nStart model evaluation script...")
@@ -40,59 +37,30 @@ print("Num GPUs Available:", len(tf.config.list_physical_devices('GPU')))
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument('--type', default=None, type=str, nargs='+',
-                    help='Type of model to build (dnn, efn, pfn)')
-parser.add_argument('-b', '--batchSize', default=100, type=int,
-                    help='Batch size')
-parser.add_argument('--maxConstits', default=80, type=int,
-                    help='Number of constituents to include per event')
 parser.add_argument('--file', default=None, type=str, nargs='+',
                     help='File name of network checkpoint')
 parser.add_argument('--names', default=None, type=str, nargs='+',
                     help='Names of model for plotting/saving')
 args = parser.parse_args()
 
-if (len(args.type) != len(args.file)) and (len(args.type) != len(args.names)):
-    raise ValueError("Length of type, names, and file command line args must match!")
-
-###################### Set parameters for evaluation #######################
+###################### Set parameters #######################
 
 # Net parameters
-net_type = args.type
 net_file = args.file
 net_name = args.names
-batch_size = args.batchSize
-
-# Data parameters
-filepath = "/pub/kgreif/samples/h5dat/test.h5"
-
-############################# Process Data ################################
-
-# Now build data loaders. Will need one for each model
-print("Building data objects...")
-loaders = []
-for ntype in args.type:
-    this_loader = DataLoader(filepath, net_type=ntype, mode='test')
-    loaders.append(this_loader)
 
 ############################# Evaluation Loop #############################
 
-for model_num, (file, type, name, dloader) in enumerate(zip(net_file, net_type, net_name, loaders)):
+for model_num, (file, name) in enumerate(zip(net_file, net_name)):
 
-    # Load model
-    print("\nLoading model ", name)
-    model = tf.keras.models.load_model(file)
-
-    # Print summary
-    model.summary()
-
-    # Evaluate model
-    print("\nEvaluation for ", name)
-    preds = model.predict(dloader, batch_size=batch_size)
-    disc_preds = (preds > 0.5).astype(int)
+    # Load data from file
+    evaluation = np.load(file)
+    preds = evaluation['preds']
+    disc_preds = evaluation['disc_preds']
+    labels = evaluation['labels']
+    pt = evaluation['jet_pt']
 
     # Make a histogram of network output, separated into signal/background
-    labels = dloader.file['labels'][:]
     preds_sig = preds[labels == 1]
     preds_bkg = preds[labels == 0]
     hist_bins = np.linspace(0, 1.0, 100)
@@ -118,7 +86,7 @@ for model_num, (file, type, name, dloader) in enumerate(zip(net_file, net_type, 
         # color = '#b8b8b8'
         color = plt.rcParams['axes.prop_cycle'].by_key()['color'][model_num]
     else:
-        color = plt.rcParams['axes.prop_cycle'].by_key()['color'][model_num-1]
+        color = plt.rcParams['axes.prop_cycle'].by_key()['color'][model_num]
     plt.figure(2)
     plt.plot(tpr, fprinv, label=name, color=color)
 
@@ -135,7 +103,6 @@ for model_num, (file, type, name, dloader) in enumerate(zip(net_file, net_type, 
     # Now we want to bin performance information into pt bins. Let's loop through
     # an array of bins. Note array defines bin edges so we want to go up to
     # len - 1
-    pt = dloader.file['fjet_pt'][:]
     pt_bins = np.linspace(350000, 3150000, 15)
     jet_indeces = np.arange(0, len(labels), 1)
     wp_50_array = np.zeros(len(pt_bins)-1)
