@@ -4,13 +4,14 @@
 
 # Set up sbatch arguments
 
-#SBATCH --job-name=hlDNN_tunev2                   ## Name of the job.
+#SBATCH --job-name=pfn_tune                       ## Name of the job.
 #SBATCH -A kgreif                                 ## account to charge 
 #SBATCH -p free-gpu                               ## partition/queue name
-#SBATCH --cpus-per-task=2                        ## Only need 1 CPU for each task
-#SBATCH --gpus-per-task=2                         ## Use only 1 GPU
-#SBATCH --nodes=2                                 ## (-N) number of nodes to use
-#SBATCH --mem-per-cpu=3G                          ## Should only need standard amount of memory
+#SBATCH --cpus-per-task=2                         ## Run 2 trials on each node
+#SBATCH --gpus-per-node=2                        ## Need 1 gpu per trial
+#SBATCH --nodes=3                                 ## (-N) number of nodes to use
+#SBATCH --mem-per-cpu=3G                          ## Should only need standard amount of RAM
+#SBATCH --tmp=80G                                 ## But need 80GB of scratch for data
 #SBATCH --ntasks-per-node 1
 
 #SBATCH --time=00-08:00:00                      
@@ -50,7 +51,7 @@ echo "IP Head: $ip_head"
 echo "Starting HEAD at $head_node"
 srun --nodes=1 --ntasks=1 -w "$head_node" \
     ray start --head --node-ip-address="$head_node_ip" --port=$port \
-    --num-cpus "${SLURM_CPUS_PER_TASK}" --num-gpus "${SLURM_GPUS_PER_TASK}" --block &
+    --num-cpus "${SLURM_CPUS_PER_TASK}" --num-gpus "${SLURM_GPUS_PER_NODE}" --block &
 
 # Start worker nodes
 sleep 10
@@ -63,11 +64,15 @@ for ((i = 1; i <= worker_num; i++)); do
     echo "Starting WORKER $i at $node_i"
     srun --nodes=1 --ntasks=1 -w "$node_i" \
         ray start --address "$ip_head" \
-        --num-cpus "${SLURM_CPUS_PER_TASK}" --num-gpus "${SLURM_GPUS_PER_TASK}" --block &
+        --num-cpus "${SLURM_CPUS_PER_TASK}" --num-gpus "${SLURM_GPUS_PER_NODE}" --block &
     sleep 5
 done
 
-# Set up directory tree before sbatch arguments
+# Set tmpdir to correct location
+export TMPDIR=/tmp/tt_data
+mkdir -p $TMPDIR 
+
+# Set up directory tree
 homedir=$(pwd)
 trdir="${homedir}/tuning"
 mkdir -p ${trdir}
@@ -80,6 +85,11 @@ echo $SLURM_JOB_NAME
 echo $SLURM_JOB_ID
 echo "================================"
 
+# Transfer data onto node scratch memory
+echo "Now transferring file from /pub to /tmp"
+cp /pub/kgreif/samples/h5dat/train_mc_m.h5 $TMPDIR
+ls $TMPDIR 
+
 # Command to run tuning script
 command="python hp_train.py"
 
@@ -89,8 +99,11 @@ echo "Will run command ${command}"
 $command
 echo -e "\nDone!"
 
-# Finally move output files from outfiles to trdir
+# Move output files from outfiles to trdir
 echo "================================"
 echo "Transferring output files..."
 mv ${homedir}/outfiles/${SLURM_JOB_NAME}.out ${trdir}
 mv ${homedir}/outfiles/${SLURM_JOB_NAME}.err ${trdir}
+
+# Delete tmp files
+rm -rf $TMPDIR

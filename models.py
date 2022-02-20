@@ -10,7 +10,7 @@ Last updated 1/4/22
 from energyflow.archs import EFN, PFN
 from classification_models.tfkeras import Classifiers
 import tensorflow as tf
-import tensorflow_addons as tfa
+# import tensorflow_addons as tfa
 import numpy as np
 
 from pnet.tf_keras_model import get_particle_net
@@ -101,8 +101,10 @@ def build_model(setup, sample_shape, summary=True):
             F_acts="relu",
             Phi_k_inits="glorot_normal",
             F_k_inits="glorot_normal",
-            latent_dropout=0.0,
-            F_dropouts=setup['dropout'],
+            latent_dropout=setup['latent_dropout'],
+            F_dropouts=setup['f_dropout'],
+            Phi_l2_regs=setup['phi_reg'],
+            F_l2_regs=setup['f_reg'],
             mask_val=0,
             loss="binary_crossentropy",
             optimizer=tf.keras.optimizers.Adam(learning_rate=setup['learningRate']),
