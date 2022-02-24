@@ -7,10 +7,9 @@ python3
 Last updated 1/4/22
 """
 
-from energyflow.archs import EFN, PFN
-from classification_models.tfkeras import Classifiers
+# from energyflow.archs import EFN, PFN
+# from classification_models.tfkeras import Classifiers
 import tensorflow as tf
-import tensorflow_addons as tfa
 import numpy as np
 
 from pnet.tf_keras_model import get_particle_net
@@ -142,7 +141,7 @@ def build_model(setup, sample_shape, summary=True):
 
         # Compile model
         model.compile(
-            optimizer=tfa.optimizers.AdamW(weight_decay=1e-4, learning_rate=setup['learningRate']),
+            optimizer=tf.keras.optimizers.Adam(learning_rate=setup['learningRate']),
             loss=tf.keras.losses.BinaryCrossentropy(from_logits=False),
             metrics=[tf.keras.metrics.BinaryAccuracy(name='acc')]
         )
