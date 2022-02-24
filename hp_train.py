@@ -3,7 +3,7 @@ ray tune. It will set up a search space, and run the tuning job using the
 trainable defined in rt_objective.py.
 
 Authors: Kevin Greif
-Last updated 1/10/22
+Last updated 2/19/22
 python3
 """
 
@@ -15,21 +15,24 @@ from ray.tune.suggest.hyperopt import HyperOptSearch
 from rt_objective import objective
 
 # Set epochs
-max_epochs = 40
+max_epochs = 30
 
 # Start by setting up search space
 config = {
-    "filepath": '/pub/kgreif/samples/h5dat/train_mc_m.h5',
-    "type": 'hldnn',
+    "filepath": '/tmp/tt_data/train_mc_m.h5',
+    "type": 'pfn',
     "maxConstits": 80,
     "numFolds": 5,
     "fold": None,
-    "hidden_layers": tune.quniform(2, 5, 1),
-    "nodes_per_layer": tune.quniform(10, 200, 10),
+    "phi_layers": tune.quniform(1, 5, 1),
+    "phi_nodes": tune.quniform(50, 400, 50), 
+    "f_layers": tune.quniform(2, 5, 1),
+    "f_nodes": tune.quniform(100, 500, 50),
     "learningRate": tune.loguniform(1e-5, 1e-2),
-    "batchNorm": tune.choice([True, False]),
-    "dropout": tune.uniform(0, 0.2),
-    "l1reg": tune.loguniform(1e-6, 1e-3),
+    "latent_dropout": tune.uniform(0, 0.2),
+    "f_dropout": tune.uniform(0, 0.2),
+    "phi_reg": tune.loguniform(1e-6, 1e-2),
+    "f_reg": tune.loguniform(1e-6, 1e-2),
     "numEpochs": max_epochs,
     "batchSize": tune.quniform(100, 500, 50)
 }
@@ -42,18 +45,18 @@ algo = HyperOptSearch(
     metric='score',
     mode='min'
 )
-algo = ConcurrencyLimiter(algo, max_concurrent=6)
+algo = ConcurrencyLimiter(algo, max_concurrent=9)
 
 # Then run the trial
 analysis = tune.run(
     objective,
     search_alg=algo,
     config=config,
-    name='hldnn_v2',
+    name='pfn',
     resume="AUTO",
     metric='score',
     mode='min',
-    num_samples=150,
+    num_samples=160,
     keep_checkpoints_num=1,
     checkpoint_score_attr='min-score',
     stop={'training_iteration': max_epochs},
