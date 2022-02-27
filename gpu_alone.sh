@@ -56,14 +56,15 @@ do
 	ls -lrth
 
 	# Next build command to run python training script
-	command="python ${homedir}/kf_train.py --numFolds ${numfolds} --fold ${fold} --type efn --phisizes 80 80 --fsizes 80 50 25 10 --numEpochs 50 --maxConstits 80"
+	command="python ${homedir}/kf_train.py --numFolds ${numfolds} --fold ${fold} --type pnet --numEpochs 20 --learningRate 1e-4 --maxConstits 80 --batchSize 384"
+	# command="python ${homedir}/kf_train.py --numFolds ${numfolds} --fold ${fold} --type efn --phisizes 80 80 --fsizes 80 50 25 10 --numEpochs 50 --maxConstits 80"
 	# command="python ${homedir}/pr_train.py --type efn --phisizes 80 80 --fsizes 80 50 25 10 --numEpochs 100"
 	# command="python ${homedir}/up_train.py --numFolds ${numfolds} --fold ${fold} --type efn --phisizes 80 80 --fsizes 80 50 25 10 --numEpochs 50 --maxConstits 80"
 
 	# Run command
 	echo "================================"
 	echo "Will run command ${command}"
-	# $command
+	$command
 	echo -e "\nDone!"
 
     } > ${trdir}/output.log 2>${trdir}/error.log

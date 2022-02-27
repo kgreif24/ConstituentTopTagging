@@ -7,7 +7,8 @@ python3
 Last updated 1/4/22
 """
 
-# from energyflow.archs import EFN, PFN
+
+from energyflow.archs import EFN, PFN
 # from classification_models.tfkeras import Classifiers
 import tensorflow as tf
 import numpy as np
