@@ -12,7 +12,7 @@
 #SBATCH --nodes=3                                 ## (-N) number of nodes to use
 #SBATCH --mem-per-cpu=3G                          ## Should only need standard amount of RAM
 #SBATCH --tmp=80G                                 ## But need 80GB of scratch for data
-#SBATCH --ntasks-per-node 1
+#SBATCH --ntasks-per-node=1                       
 
 #SBATCH --time=00-08:00:00                      
 
@@ -97,5 +97,10 @@ echo "Transferring output files..."
 mv ${homedir}/outfiles/${SLURM_JOB_NAME}.out ${trdir}
 mv ${homedir}/outfiles/${SLURM_JOB_NAME}.err ${trdir}
 
-# Delete tmp files
-rm -rf $TMPDIR
+# Stop ray runtimes
+echo "Stopping ray on ${nodes_array}"
+scancel -w ${nodes_array}
+
+# Delete tmp files on each node
+echo "Deleting tmp files"
+srun --ntasks-per-node=1 rm -rf $TMPDIR

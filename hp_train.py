@@ -67,3 +67,6 @@ analysis = tune.run(
 
 # Print results
 print("Best hyperparameters found were:", analysis.best_config)
+
+# Exit ray
+ray.shutdown()
