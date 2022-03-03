@@ -7,8 +7,10 @@ python3
 Last updated 1/4/22
 """
 
-# from energyflow.archs import EFN, PFN
-# from classification_models.tfkeras import Classifiers
+import collections
+
+from energyflow.archs import EFN, PFN
+from classification_models.tfkeras import Classifiers
 import tensorflow as tf
 import numpy as np
 
@@ -114,10 +116,18 @@ def build_model(setup, sample_shape, summary=True):
 
     elif setup['type'] == 'resnet':
 
-        # Define ResNeXt model using functional API
+        # Make param named tuple for resnet
+        ModelParams = collections.namedtuple(
+            'ModelParams',
+            ['model_name', 'repetitions', 'attention']
+        )
+        params = ModelParams('resnet50', (3, 4, 6, 3), None)
+
+        # Load ResNet 50 from image classifiers
         input_tens = tf.keras.layers.Input(shape=sample_shape)
         ResNet50, preprocess_input = Classifiers.get('resnet50')
-        model = ResNet50(input_shape=sample_shape,
+        model = ResNet50(params,
+                         input_shape=sample_shape,
                          input_tensor=input_tens,
                          include_top=False,
                          classes=1,
