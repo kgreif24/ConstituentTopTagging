@@ -11,30 +11,31 @@ import ray
 from ray import tune
 from ray.tune.suggest import ConcurrencyLimiter
 from ray.tune.suggest.hyperopt import HyperOptSearch
+from hyperopt import hp
 
 from rt_objective import objective
 
 # Set epochs
-max_epochs = 30
+max_epochs = 10
 
 # Start by setting up search space
-config = {
-    "filepath": '/tmp/tt_data/train_mc_m.h5',
-    "type": 'pfn',
+space = {
+    "filepath": '/tmp/tag_data/train_mc_s.h5',
+    "type": 'resnet',
     "maxConstits": 80,
     "numFolds": 5,
     "fold": None,
-    "phi_layers": tune.quniform(1, 5, 1),
-    "phi_nodes": tune.quniform(50, 400, 50), 
-    "f_layers": tune.quniform(2, 5, 1),
-    "f_nodes": tune.quniform(100, 500, 50),
-    "learningRate": tune.loguniform(1e-5, 1e-2),
-    "latent_dropout": tune.uniform(0, 0.2),
-    "f_dropout": tune.uniform(0, 0.2),
-    "phi_reg": tune.loguniform(1e-6, 1e-2),
-    "f_reg": tune.loguniform(1e-6, 1e-2),
     "numEpochs": max_epochs,
-    "batchSize": tune.quniform(100, 500, 50)
+    "stages": hp.choice('stages', [
+        (hp.quniform('stage1.1', 1, 6, 1),),
+        (hp.quniform('stage2.1', 1, 6, 1), hp.quniform('stage2.2', 1, 6, 1)),
+        (hp.quniform('stage3.1', 1, 6, 1), hp.quniform('stage3.2', 1, 6, 1), hp.quniform('stage3.3', 1, 4, 1)),
+        (hp.quniform('stage4.1', 1, 6, 1), hp.quniform('stage4.2', 1, 6, 1), hp.quniform('stage4.3', 1, 4, 1), hp.quniform('stage4.4', 1, 3, 1))
+    ]),
+    "dropout": hp.uniform('dropout', 0, 0.6),
+    "bnMom": hp.uniform('bnMom', 0.1, 0.99),
+    "learningRate": hp.loguniform('learningRate', 1e-5, 1e-2),
+    "batchSize": hp.quniform('batchSize', 100, 500, 50)
 }
 
 # Attach ray cluster
@@ -42,21 +43,21 @@ ray.init(address='auto')
 
 # Make search algorithm
 algo = HyperOptSearch(
+    space,
     metric='score',
     mode='min'
 )
-algo = ConcurrencyLimiter(algo, max_concurrent=9)
+algo = ConcurrencyLimiter(algo, max_concurrent=1)
 
 # Then run the trial
 analysis = tune.run(
     objective,
     search_alg=algo,
-    config=config,
-    name='pfn',
+    name='resnet',
     resume="AUTO",
     metric='score',
     mode='min',
-    num_samples=160,
+    num_samples=2,
     keep_checkpoints_num=1,
     checkpoint_score_attr='min-score',
     stop={'training_iteration': max_epochs},

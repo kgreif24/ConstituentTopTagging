@@ -18,14 +18,13 @@ def node_list(num_layers, num_nodes):
 
 def objective(config, checkpoint_dir=None):
 
-    # Extract number of epochs for each iteration
-    num_epochs = config['numEpochs']
+    # For resnet, node list is already in config
 
-    # Find node lists and make them an element of the config dictionary
-    config['phisizes'] = node_list(config['phi_layers'], config['phi_nodes'])
-    config['fsizes'] = node_list(config['f_layers'], config['f_nodes'])
+    # # Find node lists and make them an element of the config dictionary
+    # config['phisizes'] = node_list(config['phi_layers'], config['phi_nodes'])
+    # config['fsizes'] = node_list(config['f_layers'], config['f_nodes'])
 
-    # Initialize base trainer class. This is a stupid signature!
+    # Initialize base trainer class
     trainer = BaseTrainer(config, config['filepath'])
 
     # Build tune callback

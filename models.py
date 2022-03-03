@@ -121,7 +121,7 @@ def build_model(setup, sample_shape, summary=True):
             'ModelParams',
             ['model_name', 'repetitions', 'attention']
         )
-        params = ModelParams('resnet50', setup['nodes'], None)
+        params = ModelParams('resnet50', setup['stages'], None)
 
         # Load ResNet 50 from image classifiers
         input_tens = tf.keras.layers.Input(shape=sample_shape)
