@@ -12,9 +12,6 @@ import sys, os
 import argparse
 
 # Package imports
-import energyflow as ef
-from energyflow.archs import EFN
-import tensorflow as tf
 import sklearn.metrics as metrics
 import numpy as np
 
@@ -26,11 +23,6 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 plt.style.use('~/mattyplotsalot/allpurpose.mplstyle')
 import colorcet as cc
-
-
-# If GPU is available, print message
-print("\nStart model evaluation script...")
-print("Num GPUs Available:", len(tf.config.list_physical_devices('GPU')))
 
 
 ########################## Parse Arguments ###########################

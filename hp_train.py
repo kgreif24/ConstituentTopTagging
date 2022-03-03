@@ -15,7 +15,7 @@ from ray.tune.suggest.hyperopt import HyperOptSearch
 from rt_objective import objective
 
 # Set epochs
-max_epochs = 3
+max_epochs = 30
 
 # Start by setting up search space
 config = {
@@ -45,7 +45,7 @@ algo = HyperOptSearch(
     metric='score',
     mode='min'
 )
-algo = ConcurrencyLimiter(algo, max_concurrent=6)
+algo = ConcurrencyLimiter(algo, max_concurrent=9)
 
 # Then run the trial
 analysis = tune.run(
@@ -56,7 +56,7 @@ analysis = tune.run(
     resume="AUTO",
     metric='score',
     mode='min',
-    num_samples=6,
+    num_samples=160,
     keep_checkpoints_num=1,
     checkpoint_score_attr='min-score',
     stop={'training_iteration': max_epochs},
@@ -67,3 +67,6 @@ analysis = tune.run(
 
 # Print results
 print("Best hyperparameters found were:", analysis.best_config)
+
+# Exit ray
+ray.shutdown()

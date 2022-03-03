@@ -7,12 +7,12 @@
 #SBATCH --job-name=pfn_tune                       ## Name of the job.
 #SBATCH -A kgreif                                 ## account to charge 
 #SBATCH -p free-gpu                               ## partition/queue name
-#SBATCH --cpus-per-task=2                         ## Run 2 trials on each node
-#SBATCH --gpus-per-node=2                        ## Need 1 gpu per trial
+#SBATCH --cpus-per-task=3                         ## Run 3 trials on each node
+#SBATCH --gpus-per-node=3                        ## Need 1 gpu per trial
 #SBATCH --nodes=3                                 ## (-N) number of nodes to use
 #SBATCH --mem-per-cpu=3G                          ## Should only need standard amount of RAM
 #SBATCH --tmp=80G                                 ## But need 80GB of scratch for data
-#SBATCH --ntasks-per-node 1
+#SBATCH --ntasks-per-node=1                       
 
 #SBATCH --time=00-08:00:00                      
 
@@ -21,6 +21,15 @@
 
 #SBATCH --mail-type=END,FAIL                      ## Send email
 #SBATCH --mail-user=kgreif@uci.edu                ## to this address
+
+
+# Transfer data to scratch on each node
+echo "Making tmpdir on each node"
+export TMPDIR=/tmp/tt_data
+srun --ntasks-per-node=1 mkdir -p $TMPDIR 
+echo "Now transferring file from /pub to /tmp"
+srun --ntasks-per-node=1 cp /pub/kgreif/samples/h5dat/train_mc_m.h5 $TMPDIR
+echo "Done transferring files"
 
 
 # Getting the node names
@@ -68,27 +77,10 @@ for ((i = 1; i <= worker_num; i++)); do
     sleep 5
 done
 
-# Set tmpdir to correct location
-export TMPDIR=/tmp/tt_data
-mkdir -p $TMPDIR 
-
 # Set up directory tree
 homedir=$(pwd)
 trdir="${homedir}/tuning"
 mkdir -p ${trdir}
-
-# On to running the job!
-# Start by printing out hostname and date of job
-echo "Found a node, here's some info: "
-hostname; date
-echo $SLURM_JOB_NAME
-echo $SLURM_JOB_ID
-echo "================================"
-
-# Transfer data onto node scratch memory
-echo "Now transferring file from /pub to /tmp"
-cp /pub/kgreif/samples/h5dat/train_mc_m.h5 $TMPDIR
-ls $TMPDIR 
 
 # Command to run tuning script
 command="python hp_train.py"
@@ -105,5 +97,10 @@ echo "Transferring output files..."
 mv ${homedir}/outfiles/${SLURM_JOB_NAME}.out ${trdir}
 mv ${homedir}/outfiles/${SLURM_JOB_NAME}.err ${trdir}
 
-# Delete tmp files
-rm -rf $TMPDIR
+# Stop ray runtimes
+echo "Stopping ray on ${nodes_array}"
+scancel -w ${nodes_array}
+
+# Delete tmp files on each node
+echo "Deleting tmp files"
+srun --ntasks-per-node=1 rm -rf $TMPDIR
