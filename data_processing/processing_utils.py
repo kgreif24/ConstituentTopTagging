@@ -26,7 +26,7 @@ def find_raw_len(filename):
     """
 
     events = uproot.open(filename)
-    return ak.num(events['fatjet_pt'], axis=0)
+    return ak.num(events['fjet_pt'], axis=0)
 
 def find_cut_len(filename, cuts):
     """ find_cut_len - Take in a path to a .root file and returns the number of 
@@ -41,8 +41,8 @@ def find_cut_len(filename, cuts):
     """
 
     events = uproot.open(filename)
-    arrays = events.arrays("fatjet_pt", cut=cuts)
-    return ak.num(arrays['fatjet_pt'], axis=0)
+    arrays = events.arrays("fjet_pt", cut=cuts)
+    return ak.num(arrays['fjet_pt'], axis=0)
 
 def find_h5_len(filename):
     """ find_h5_len - Take in a path to a .h5 file and returns the length of 

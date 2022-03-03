@@ -1,8 +1,5 @@
-""" root2hd5.py - This script will read in data from a .root file using uproot's
-iterate feature, and save the data chunk by chunk into a hf file. The idea is
-that it will be easy to write a python generator for loading data from h5py
-while we can't really do this using uproot since uproot doesn't support slicing
-by indeces (except for lazy arrays, but these are very slow).
+""" r2h_lognorm.py - This script does the same thing as root2hd5.py, but uses
+the lognorm preprocessing, which prepares 7 inputs for Particle Net
 
 Author: Kevin Greif
 python3
@@ -38,22 +35,24 @@ else:
 ############### Conversion Setup ##################
 
 #  Setup the branches we want to pull from .root file and write to target files
-constit_branches = ['fjet_clus_pt', 'fjet_clus_eta',
+s_constit_branches = ['fjet_clus_pt', 'fjet_clus_eta',
                   'fjet_clus_phi', 'fjet_clus_E']
 hl_branches = ['fjet_Tau1_wta', 'fjet_Tau2_wta', 'fjet_Tau3_wta', 'fjet_Tau4_wta',
                'fjet_Split12', 'fjet_Split23', 'fjet_ECF1', 'fjet_ECF2', 'fjet_ECF3', 
                'fjet_C2', 'fjet_D2', 'fjet_Qw', 'fjet_L2', 'fjet_L3', 'fjet_ThrustMaj']
+t_constit_branches = ['fjet_clus_eta', 'fjet_clus_phi', 'fjet_log_pt', 'fjet_log_E',
+                      'fjet_lognorm_pt', 'fjet_lognorm_E', 'fjet_dR']
 images_branch = ['images']
 pt_branch = ['fjet_pt']
 label_branch = ['labels']
-source_branches = constit_branches + hl_branches + pt_branch
-target_branches = source_branches + images_branch + label_branch
+source_branches = s_constit_branches + hl_branches + pt_branch
+target_branches = t_constit_branches + hl_branches + pt_branch + images_branch + label_branch
 
 # Setup up options for pulling constituents
 max_constits = 200
 
 # Set number of files we are going to break jets into
-n_files = 36
+n_files = 72
 
 # Setup cuts we want to make on jets
 common = "(abs(fjet_truthJet_eta)<2.0) & (fjet_truthJet_pt/1000.>350.) & (fjet_numConstituents > 3) & (fjet_m/1000.>40.)"
@@ -75,7 +74,7 @@ else:
     rw_type = 'a'
 
 # Set directory for target files
-tar_dir = './dataloc/intermediates_mc/'
+tar_dir = './dataloc/intermediates_ln/'
 
 # Finally, since we have a certain number of good jets in signal files, this will be the number
 # of jets we ultimately want to include from both sig and background
@@ -140,10 +139,13 @@ for file_num in range(n_files):
 
         # If signal we need to fresh create all datasets and put them in the file dictionary
         constits_size = (max_file_jets, max_constits)
-        filedict["fjet_clus_pt"] = filedict["file"].create_dataset("fjet_clus_pt", constits_size, maxshape=constits_size, dtype='f4')
         filedict["fjet_clus_eta"] = filedict["file"].create_dataset("fjet_clus_eta", constits_size, maxshape=constits_size, dtype='f4')
         filedict["fjet_clus_phi"] = filedict["file"].create_dataset("fjet_clus_phi", constits_size, maxshape=constits_size, dtype='f4')
-        filedict["fjet_clus_E"] = filedict["file"].create_dataset("fjet_clus_E", constits_size, maxshape=constits_size, dtype='f4')
+        filedict["fjet_log_pt"] = filedict["file"].create_dataset("fjet_log_pt", constits_size, maxshape=constits_size, dtype='f4')
+        filedict["fjet_log_E"] = filedict["file"].create_dataset("fjet_log_E", constits_size, maxshape=constits_size, dtype='f4')
+        filedict["fjet_lognorm_pt"] = filedict["file"].create_dataset("fjet_lognorm_pt", constits_size, maxshape=constits_size, dtype='f4')
+        filedict["fjet_lognorm_E"] = filedict["file"].create_dataset("fjet_lognorm_E", constits_size, maxshape=constits_size, dtype='f4')
+        filedict["fjet_dR"] = filedict["file"].create_dataset("fjet_dR", constits_size, maxshape=constits_size, dtype='f4')
         images_size = (max_file_jets, max_constits, 2)
         filedict["images"] = filedict["file"].create_dataset("images", images_size, maxshape=images_size, dtype='i4')
         hl_size = (max_file_jets)
@@ -154,7 +156,7 @@ for file_num in range(n_files):
 
         # Attribute for storing absolute number of jets written to file, and names of branches
         filedict["file"].attrs.create("num_jets", 0, dtype='i4')
-        filedict["file"].attrs.create("constit", constit_branches)
+        filedict["file"].attrs.create("constit", t_constit_branches)
         filedict["file"].attrs.create("hl", hl_branches)
         filedict["file"].attrs.create("img", images_branch)
         filedict["file"].attrs.create("pt", pt_branch)
@@ -192,7 +194,7 @@ for num_source, ifile in enumerate(files):
 
     # Iterate through the file using iterate, filtering out only branches we need
     for jet_batch, report in events.iterate(cut=total_cuts,
-                                            step_size="250 MB", 
+                                            step_size="200 MB", 
                                             filter_name=source_branches, 
                                             report=True):
 
@@ -210,28 +212,39 @@ for num_source, ifile in enumerate(files):
         pt_zero = ak.to_numpy(ak.fill_none(pt_zero, 0, axis=None))
         indeces = np.argsort(pt_zero, axis=1)
 
-        # Call preprocessing functions
-        pt_pp, en_pp = preprocessing.energy_norm(jet_batch, indeces, max_constits=max_constits)
+        # Call preprocessing functions (here use log_norm function instead of energy_norm)
+        log_pt, lognorm_pt = preprocessing.log_norm(jet_batch, 'fjet_clus_pt', indeces, max_constits=max_constits)
+        log_E, lognorm_E = preprocessing.log_norm(jet_batch, 'fjet_clus_E', indeces, max_constits=max_constits)
         eta_pp, phi_pp = preprocessing.simple_angular(jet_batch, indeces, max_constits=max_constits)
 
         # Preprocessing might introduce NaNs and Infs. Set these to zero here.
-        np.nan_to_num(pt_pp, copy=False)
-        np.nan_to_num(en_pp, copy=False)
+        np.nan_to_num(log_pt, copy=False)
+        np.nan_to_num(lognorm_pt, copy=False)
+        np.nan_to_num(log_E, copy=False)
+        np.nan_to_num(lognorm_E, copy=False)
         np.nan_to_num(eta_pp, copy=False)
         np.nan_to_num(phi_pp, copy=False)
 
         # Also make a cut on very small pT constituents
-        small_pt = np.asarray(pt_pp < 1e-12).nonzero()
-        pt_pp[small_pt] = 0
-        en_pp[small_pt] = 0
+        small_pt = np.asarray(log_pt < -20).nonzero()
+        log_pt[small_pt] = 0
+        lognorm_pt[small_pt] = 0
+        log_E[small_pt] = 0
+        lognorm_E[small_pt] = 0
         eta_pp[small_pt] = 0
         phi_pp[small_pt] = 0
 
+        # Calculate dR using eta and phi, element by element
+        dR = np.sqrt(eta_pp ** 2 + phi_pp ** 2)
+
         # Send pre-processed constituents to batch_data
-        batch_data["fjet_clus_pt"] = pt_pp
         batch_data["fjet_clus_eta"] = eta_pp
         batch_data["fjet_clus_phi"] = phi_pp
-        batch_data["fjet_clus_E"] = en_pp
+        batch_data["fjet_log_pt"] = log_pt
+        batch_data["fjet_log_E"] = log_E
+        batch_data["fjet_lognorm_pt"] = lognorm_pt
+        batch_data["fjet_lognorm_E"] = lognorm_E
+        batch_data["fjet_dR"] = dR
 
         ##################### Images ####################
 
@@ -281,9 +294,9 @@ for num_source, ifile in enumerate(files):
         drop_list = np.unique(drop_list)
 
         # Find batch length given dropped jets
-        raw_length = batch_data['fjet_clus_pt'].shape[0]
+        raw_length = batch_data['fjet_clus_eta'].shape[0]
         batch_length = raw_length - len(drop_list)
-        print("Raw number of jets in batch:", pt_pp.shape[0])
+        print("Raw number of jets in batch:", raw_length)
         print("Number of jets to drop:", len(drop_list))
         print("Number of jets to write:", batch_length)
 
@@ -367,7 +380,7 @@ if not svb_flag:
         hl_size = (end_index[file_num],)
     
         # Loop through all target branches and resize
-        for branch in constit_branches:
+        for branch in t_constit_branches:
             targ_file[branch].resize(constits_size)
 
         for branch in images_branch:
