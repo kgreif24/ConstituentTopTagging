@@ -25,17 +25,21 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--type', default='dnn', type=str,
                     help='Type of model to build (dnn, efn, pfn)')
 parser.add_argument('--nodes', default=None, type=int, nargs='*',
-                    help='DNN number of nodes in layers')
+                    help='DNN number of nodes in layers, or resnet number of blocks in stages')
 parser.add_argument('--fsizes', default=[], type=int, nargs='*',
                     help='EFN/PFN number of nodes in f layers')
 parser.add_argument('--phisizes', default=[], type=int, nargs='*',
                     help='EFN/PFN number of nodes in phi layers')
 parser.add_argument('--batchNorm', action='store_true', default=False,
                     help='If present, use batch norm in DNN based models')
+parser.add_argument('--latent_dropout', default=0., type=float,
+                    help='The dropout rate to apply to the latent layer in EFN/PFN networks')
 parser.add_argument('--dropout', default=0., type=float,
                     help='The dropout rate to use in DNN layers and in EFN/PFN F network')
 parser.add_argument('--l1reg', default=0., type=float,
                     help='The amount of L1 regularization to apply to DNN based networks')
+parser.add_argument('--bnMom', default=0.1, type=float,
+                    help='The momentum to use in batch normalization layers (resnet specific)')
 parser.add_argument('-N', '--numEpochs', default=100, type=int,
                     help='Number of epochs')
 parser.add_argument('-b', '--batchSize', default=100, type=int,
