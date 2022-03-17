@@ -4,7 +4,7 @@ weights. It will then combine h5 files into one single h5 file that can be
 directly passed to a training routine.
 
 Author: Kevin Greif
-Last updated 12/14/21
+Last updated 3/5/22
 python3
 """
 
@@ -17,8 +17,9 @@ import processing_utils as pu
 
 # We start by finding a list of all intermediate files sitting in intermediate
 # file folder.
-search_string = "./dataloc/intermediates_small/*.h5"
-file_list = glob.glob(search_string)
+n_files = 32
+search_string = "./dataloc/intermediates_ln/*.h5"
+file_list = glob.glob(search_string)[:n_files]
 print("Will process files", file_list)
 
 # Find the lengths of each of these files
@@ -39,8 +40,8 @@ print("N test jets:", n_test)
 # Make new h5 files for training/testin. Will have stacked data for easy use in
 # network trainng
 print("Building train/test h5 files...")
-f_train = h5py.File('./dataloc/train.h5', 'w')
-f_test = h5py.File('./dataloc/test.h5', 'w')
+f_train = h5py.File('./dataloc/train_ln_m.h5', 'w')
+f_test = h5py.File('./dataloc/test_ln_m.h5', 'w')
 f_ref = h5py.File(file_list[0], 'r')
 constit_branches = f_ref.attrs.get('constit')
 hl_branches = f_ref.attrs.get('hl')
