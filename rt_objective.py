@@ -6,6 +6,7 @@ Last updated 1/10/22
 python 3
 """
 
+import os
 
 from ray import tune
 from ray.tune.integration.keras import TuneReportCheckpointCallback
@@ -18,13 +19,30 @@ def node_list(num_layers, num_nodes):
 
 def objective(config, checkpoint_dir=None):
 
-    # For resnet, node list is already in config
+    # First find whether we should load from file or build model from scratch
+    trial_dir = tune.get_trial_dir()
+    print("Looking at directory:", trial_dir)
 
-    # # Find node lists and make them an element of the config dictionary
-    # config['phisizes'] = node_list(config['phi_layers'], config['phi_nodes'])
-    # config['fsizes'] = node_list(config['f_layers'], config['f_nodes'])
+    # Initialize model dir variable to use as a "found model to load" flag
+    model_dir = None
 
-    # Initialize base trainer class
+    # Loop through number of epochs to look for newest checkpoint
+    for i in range(config['numEpochs']):
+        
+        # Build checkpoint dir to look for
+        check_dir = "checkpoint_" + str(i).zfill(6)
+        check_dir = os.path.join(trial_dir, check_dir)
+        
+        # If checkpoint dir exists, set a model directory to load from
+        if os.path.isdir(check_dir):
+            model_dir = os.path.join(check_dir, "model")
+
+    # At end of loop should have newest checkpoint directory if one exists
+    # Now alter config dict so we load from checkpoint
+    if model_dir is not None:
+        config['checkpoint'] = model_dir
+
+    # Create base trainer class
     trainer = BaseTrainer(config, config['filepath'])
 
     # Build tune callback

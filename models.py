@@ -14,6 +14,7 @@ from classification_models.tfkeras import Classifiers
 import tensorflow as tf
 import numpy as np
 
+from classification_models.tfkeras import Classifiers
 from pnet.tf_keras_model import get_particle_net
 
 
@@ -121,7 +122,7 @@ def build_model(setup, sample_shape, summary=True):
             'ModelParams',
             ['model_name', 'repetitions', 'attention']
         )
-        params = ModelParams('resnet50', setup['stages'], None)
+        params = ModelParams('resnet50', setup['nodes'], None)
 
         # Load ResNet 50 from image classifiers
         input_tens = tf.keras.layers.Input(shape=sample_shape)
@@ -151,7 +152,7 @@ def build_model(setup, sample_shape, summary=True):
 
         # Get particle net model
         shapes = {'points': (sample_shape[0],2), 'features': sample_shape, 'mask': (sample_shape[0],1)}
-        model = get_particle_net(1, shapes)
+        model = get_particle_net(1, shapes, setup)
 
         # Compile model
         model.compile(

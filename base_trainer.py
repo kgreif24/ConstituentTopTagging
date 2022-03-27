@@ -26,17 +26,17 @@ class BaseTrainer:
             the model. Required items are as follows:
 
             1. type (string) - A string that gives the type of model to train, e.g. 'pfn'
-            3. batchSize (int) - The batch size to use
-            4. numFolds (int) - The number of folds to partition training data into.
+            2. batchSize (int) - The batch size to use
+            3. numFolds (int) - The number of folds to partition training data into.
                 This can be used to tune the train/valid split ratio
-            5. fold (int) - The fold to be reserved as validation data. If None, a random
+            4. fold (int) - The fold to be reserved as validation data. If None, a random
                 fold is selected.
-            6+. The rest of the hyperparameters needed to train the model
+            5+. The rest of the hyperparameters needed to train the model
 
         or...
 
-        setup (string) - The path of the file from which we want to load a model
-            checkpoint.
+        setup (dict) - A python dict whose elements tell us how to load the model. Required items 
+        are as above, with path to directory containing saved model in place of model type.
 
         datafile (string) - The location of .h5 file we will use to train
 
@@ -77,10 +77,10 @@ class BaseTrainer:
         )
 
         # Build model using models.py interface, or by simply loading tf model
-        if not isinstance(setup, str):
-            self.model = models.build_model(setup, self.dtrain.sample_shape)
+        if 'checkpoint' in setup:
+            self.model = tf.keras.models.load_model(setup['checkpoint'])
         else:
-            self.model = tf.keras.models.load_model(file)
+            self.model = models.build_model(setup, self.dtrain.sample_shape)
 
 
     def train(self, callbacks):

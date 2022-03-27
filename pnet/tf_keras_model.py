@@ -119,8 +119,8 @@ class _DotDict:
     pass
 
 
-def get_particle_net(num_classes, input_shapes):
-    r"""ParticleNet model from `"ParticleNet: Jet Tagging via Particle Clouds"
+def get_particle_net(num_classes, input_shapes, setup):
+    """ParticleNet model from `"ParticleNet: Jet Tagging via Particle Clouds"
     <https://arxiv.org/abs/1902.08570>`_ paper.
     Parameters
     ----------
@@ -128,25 +128,23 @@ def get_particle_net(num_classes, input_shapes):
         Number of output classes.
     input_shapes : dict
         The shapes of each input (`points`, `features`, `mask`).
+    setup : dict
+        Dictionary of hyper parameters
     """
     setting = _DotDict()
     setting.num_class = num_classes
     # conv_params: list of tuple in the format (K, (C1, C2, C3))
-    setting.conv_params = [
-        (16, (64, 64, 64)),
-        (16, (128, 128, 128)),
-        (16, (256, 256, 256)),
-        ]
+    setting.conv_params = [(int(setup['knn']), (int(setup['blocks']['convs'][i]),) * int(setup['block_depth'])) for i in range(int(setup['blocks']['n_blocks']))]
     # conv_pooling: 'average' or 'max'
-    setting.conv_pooling = 'average'
+    setting.conv_pooling = setup['pooling']
     # fc_params: list of tuples in the format (C, drop_rate)
-    setting.fc_params = [(256, 0.1)]
+    setting.fc_params = [(setup['nodes'], setup['dropout'])]
     setting.num_points = input_shapes['points'][0]
 
     points = keras.Input(name='points', shape=input_shapes['points'])
     features = keras.Input(name='features', shape=input_shapes['features']) if 'features' in input_shapes else None
     mask = keras.Input(name='mask', shape=input_shapes['mask']) if 'mask' in input_shapes else None
-    outputs = _particle_net_base(points, features, mask, setting, name='ParticleNet')
+    outputs = _particle_net_base(points, features=features, mask=mask, setting=setting, name='ParticleNet')
 
     return keras.Model(inputs=[points, features, mask], outputs=outputs, name='ParticleNet')
 

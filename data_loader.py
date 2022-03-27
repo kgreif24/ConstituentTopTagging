@@ -78,7 +78,7 @@ class DataLoader(Sequence):
         elif self.net_type == 'pfn':
             self.sample_shape = (self.max_constits, 4)
         elif self.net_type == 'pnet':
-            self.sample_shape = (self.max_constits, 4)
+            self.sample_shape = (self.max_constits, 7)
         else:
             raise ValueError("Model type not recognized!")
 
@@ -255,9 +255,9 @@ class DataLoader(Sequence):
             # Mask will be pT information. Use this to allow code to process
             # variable length inputs.
             shaped_data = {}
-            shaped_data['points'] = batch_data[:,:self.max_constits,1:3]
+            shaped_data['points'] = batch_data[:,:self.max_constits,0:2]
             shaped_data['features'] = batch_data[:,:self.max_constits,:]
-            shaped_data['mask'] = batch_data[:,:self.max_constits,0]  # pT
+            shaped_data['mask'] = batch_data[:,:self.max_constits,2]  # pT
 
         # Finally package everything into a tuple and return
         return shaped_data, batch_labels, batch_weights
@@ -278,9 +278,9 @@ class FakeLoader(Sequence):
 if __name__ == '__main__':
 
     # Let's set up some simple testing code.
-    filepath = "/pub/kgreif/samples/h5dat/train.h5"
+    filepath = "/tmp/tt_data/train_mc_m.h5"
 
-    dloader = DataLoader(filepath, net_type='dnn', mode='train')
+    dloader = DataLoader(filepath, net_type='pfn', mode='train')
 
     print("Loader length:", len(dloader))
     print("Sample shape:", dloader.sample_shape)
