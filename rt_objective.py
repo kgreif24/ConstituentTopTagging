@@ -42,6 +42,9 @@ def objective(config, checkpoint_dir=None):
     if model_dir is not None:
         config['checkpoint'] = model_dir
 
+    # Find node list and make it an element of the config dictionary
+    config['nodes'] = node_list(config['hidden_layers'], config['nodes_per_layer'])
+
     # Create base trainer class
     trainer = BaseTrainer(config, config['filepath'])
 

@@ -72,7 +72,7 @@ class DataLoader(Sequence):
         elif self.net_type == 'resnet':
             self.sample_shape = (64, 64, 1)  # Simply hard code image dims
         elif self.net_type == 'dnn':
-            self.sample_shape = (self.max_constits, 4)
+            self.sample_shape = (self.max_constits, 7)
         elif self.net_type == 'efn':
             self.sample_shape = (self.max_constits, 2)
         elif self.net_type == 'pfn':
@@ -211,7 +211,7 @@ class DataLoader(Sequence):
 
             # For DNNs, we need to flatten out vectors of constituents
             input_shape = (this_bs, np.prod(self.sample_shape))
-            shaped_data = batch_data[:,:self.max_constits].reshape(input_shape)
+            shaped_data = batch_data[:,:self.max_constits,:].reshape(input_shape)
 
         elif self.net_type == 'efn':
 
@@ -278,9 +278,9 @@ class FakeLoader(Sequence):
 if __name__ == '__main__':
 
     # Let's set up some simple testing code.
-    filepath = "/tmp/tt_data/train_mc_m.h5"
+    filepath = '/scratch/whiteson_group/kgreif/train_ln_m.h5'
 
-    dloader = DataLoader(filepath, net_type='pfn', mode='train')
+    dloader = DataLoader(filepath, net_type='dnn', mode='train')
 
     print("Loader length:", len(dloader))
     print("Sample shape:", dloader.sample_shape)

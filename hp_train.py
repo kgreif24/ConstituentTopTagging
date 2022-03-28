@@ -9,6 +9,7 @@ python3
 
 import ray
 from ray import tune
+from ray.tune.schedulers import ASHAScheduler
 from ray.tune.suggest import ConcurrencyLimiter
 from ray.tune.suggest.hyperopt import HyperOptSearch
 from hyperopt import hp
@@ -16,53 +17,60 @@ from hyperopt import hp
 from rt_objective import objective
 
 # Set epochs
-max_epochs = 10
+max_epochs = 80
 
 # Start by setting up search space
-space = {
-    "filepath": '/tmp/tag_data/train_mc_s.h5',
-    "type": 'resnet',
+config = {
+    "filepath": '/scratch/whiteson_group/kgreif/train_ln_m.h5',
+    "type": 'dnn',
     "maxConstits": 80,
     "numFolds": 5,
     "fold": None,
     "numEpochs": max_epochs,
-    "stages": hp.choice('stages', [
-        (hp.quniform('stage1.1', 1, 6, 1),),
-        (hp.quniform('stage2.1', 1, 6, 1), hp.quniform('stage2.2', 1, 6, 1)),
-        (hp.quniform('stage3.1', 1, 6, 1), hp.quniform('stage3.2', 1, 6, 1), hp.quniform('stage3.3', 1, 4, 1)),
-        (hp.quniform('stage4.1', 1, 6, 1), hp.quniform('stage4.2', 1, 6, 1), hp.quniform('stage4.3', 1, 4, 1), hp.quniform('stage4.4', 1, 3, 1))
-    ]),
-    "dropout": hp.uniform('dropout', 0, 0.6),
-    "bnMom": hp.uniform('bnMom', 0.1, 0.99),
-    "learningRate": hp.loguniform('learningRate', 1e-5, 1e-2),
-    "batchSize": hp.quniform('batchSize', 100, 500, 50)
+    "hidden_layers": tune.quniform(2, 5, 1),
+    "nodes_per_layer": tune.quniform(50, 500, 50),
+    "dropout": tune.uniform(0, 0.2),
+    "batchNorm": tune.choice([True, False]),
+    "l1reg": tune.loguniform(1e-5, 1e-2),
+    "learningRate": tune.loguniform(1e-5, 1e-2),
+    "batchSize": tune.quniform(100, 500, 50)
 }
 
 # Attach ray cluster
-ray.init(address='auto')
+# ray.init(address='auto')
+ray.init(num_cpus=3)
 
 # Make search algorithm
 algo = HyperOptSearch(
-    space,
     metric='score',
     mode='min'
 )
-algo = ConcurrencyLimiter(algo, max_concurrent=1)
+algo = ConcurrencyLimiter(algo, max_concurrent=3)
+
+# ASHA scheduler
+ash_scheduler = ASHAScheduler(
+    time_attr='training_iteration',
+    metric='score',
+    mode='min',
+    max_t=max_epochs,
+    grace_period=15,
+    reduction_factor=4
+)
 
 # Then run the trial
 analysis = tune.run(
     objective,
     search_alg=algo,
-    name='resnet',
+    scheduler=ash_scheduler,
+    config=config,
+    name='dnn',
     resume="AUTO",
-    metric='score',
-    mode='min',
-    num_samples=2,
+    num_samples=100,
     keep_checkpoints_num=1,
     checkpoint_score_attr='min-score',
     stop={'training_iteration': max_epochs},
     resources_per_trial={'cpu': 1, 'gpu': 1},
-    local_dir='/pub/kgreif/tt_model_repo',
+    local_dir='/DFS-L/DATA/whiteson/kgreif/tt_model_repo',
     verbose=1
 )
 
