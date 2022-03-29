@@ -17,8 +17,9 @@ import processing_utils as pu
 
 # We start by finding a list of all intermediate files sitting in intermediate
 # file folder.
-n_files = 32
-search_string = "./dataloc/intermediates_ln/*.h5"
+n_files = 16
+search_stem = "./dataloc/intermediates_mc/"
+search_string = search_stem + "*.h5"
 file_list = glob.glob(search_string)[:n_files]
 print("Will process files", file_list)
 
@@ -40,8 +41,8 @@ print("N test jets:", n_test)
 # Make new h5 files for training/testin. Will have stacked data for easy use in
 # network trainng
 print("Building train/test h5 files...")
-f_train = h5py.File('./dataloc/train_ln_m.h5', 'w')
-f_test = h5py.File('./dataloc/test_ln_m.h5', 'w')
+f_train = h5py.File('./dataloc/train_mc_m.h5', 'w')
+f_test = h5py.File('./dataloc/test_mc_m.h5', 'w')
 f_ref = h5py.File(file_list[0], 'r')
 constit_branches = f_ref.attrs.get('constit')
 hl_branches = f_ref.attrs.get('hl')
@@ -74,6 +75,9 @@ for file, num_jets in zip([f_train, f_test], [n_train, n_test]):
 # Calculate standards to be used in sending data to train/test files
 # just using first file in file list for calculation
 means, stddevs = pu.calc_standards(file_list[0])
+
+# Save standards in intermediates file for use in mcvar studies
+np.savez(search_stem + "standards.npz", means=means, stddevs=stddevs)
 
 # Send data to train/test
 print("\nBegin processing data")
