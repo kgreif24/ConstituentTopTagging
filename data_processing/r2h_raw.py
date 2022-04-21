@@ -41,7 +41,7 @@ hl_branches = ['fjet_Tau1_wta', 'fjet_Tau2_wta', 'fjet_Tau3_wta', 'fjet_Tau4_wta
                'fjet_Split12', 'fjet_Split23', 'fjet_ECF1', 'fjet_ECF2', 'fjet_ECF3', 
                'fjet_C2', 'fjet_D2', 'fjet_Qw', 'fjet_L2', 'fjet_L3', 'fjet_ThrustMaj']
 t_constit_branches = ['fjet_clus_eta', 'fjet_clus_phi', 'fjet_clus_pt', 'fjet_clus_E']
-pt_branch = ['fjet_pt']
+pt_branch = ['fjet_pt', 'fjet_eta', 'fjet_phi', 'fjet_m']
 label_branch = ['labels']
 source_branches = s_constit_branches + hl_branches + pt_branch
 target_branches = t_constit_branches + hl_branches + pt_branch + label_branch
@@ -145,6 +145,9 @@ for file_num in range(n_files):
         for hl_var in hl_branches:
             filedict[hl_var] = filedict["file"].create_dataset(hl_var, hl_size, maxshape=hl_size, dtype='f4')
         filedict["fjet_pt"] = filedict["file"].create_dataset("fjet_pt", hl_size, maxshape=hl_size, dtype='f4')
+        filedict["fjet_eta"] = filedict["file"].create_dataset("fjet_eta", hl_size, maxshape=hl_size, dtype='f4')
+        filedict["fjet_phi"] = filedict["file"].create_dataset("fjet_phi", hl_size, maxshape=hl_size, dtype='f4')
+        filedict["fjet_m"] = filedict["file"].create_dataset("fjet_m", hl_size, maxshape=hl_size, dtype='f4')
         filedict["labels"] = filedict["file"].create_dataset("labels", hl_size, maxshape=hl_size, dtype='i4')
 
         # Attribute for storing absolute number of jets written to file, and names of branches
@@ -237,13 +240,16 @@ for num_source, ifile in enumerate(files):
         batch_data["fjet_clus_pt"] = pt_sort
         batch_data["fjet_clus_E"] = en_sort
 
-        #################### Jet pT #####################
+        #################### UFO 4 vector #####################
 
-        # Also need to get jet pt quickly
-        batch_pt = jet_batch['fjet_pt']
+        # Loop through UFO 4 vector list
+        for comp_name in pt_branch:
 
-        # Send batch pt to batch data
-        batch_data["fjet_pt"] = ak.to_numpy(batch_pt)
+            # Pull data
+            batch_comp = jet_batch[comp_name]
+
+            # Send data to batch data
+            batch_data[comp_name] = ak.to_numpy(batch_comp)
 
         ##################### High Level #################
 

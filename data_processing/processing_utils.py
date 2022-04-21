@@ -252,6 +252,58 @@ def send_data(file_list, target, hl_means, hl_stddevs):
     target.attrs.modify("num_jets", stop_index)
 
 
+def unstacked_send(file_list, target):
+    """ unstacked_send - The same function as above, except it skips the stacking
+    and hl variable standardization steps. This is for use in generating the 
+    public facing data set.
+
+    Arguments:
+    file_list (list) - List of paths to intermediate files
+    target (string) - The target file h5py object
+
+    Returns:
+    None
+    """
+
+    # Start counter to keep track of write index in target file
+    start_index = 0
+
+    # Loop through file list
+    for i, file_name in enumerate(file_list):
+        print("Now processing file:", file_name)
+
+        # Open file
+        file = h5py.File(file_name, 'r')
+        num_file_jets = file.attrs.get("num_jets")
+        stop_index = start_index + num_file_jets
+
+        # Extract dataset names from attributes
+        constit_branches = file.attrs.get('constit')
+        hl_branches = file.attrs.get('hl')
+        jet_branches = file.attrs.get('pt')
+        label_branch = file.attrs.get('label')
+        unstacked = np.concatenate((constit_branches, hl_branches, jet_branches, label_branch))
+
+        # Get random seed for our shuffles
+        rng_seed = np.random.default_rng()
+        rseed = rng_seed.integers(1000)
+
+        # Process data
+        for var in unstacked:
+            this_var = file[var][...]
+            branch_shuffle(this_var, seed=rseed)
+            target[var][start_index:stop_index,...] = this_var
+
+        # Increment counters and close file
+        start_index = stop_index
+        file.close()
+
+    # End by printing summary of how many jets were written to file
+    print("We wrote", stop_index, "jets to target file")
+    target.attrs.modify("num_jets", stop_index)
+
+
+
 def branch_shuffle(branch, seed=42):
     """ branch_shuffle - This shuffle takes in a dataset represented by a numpy array,
     as well as a seed for a random generator. It will then shuffle the branch using numpys
