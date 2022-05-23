@@ -227,8 +227,8 @@ for num_source, ifile in enumerate(files):
         phi_sort = np.take_along_axis(phi_zero, indeces, axis=1)[:,::-1]
         en_sort = np.take_along_axis(en_zero, indeces, axis=1)[:,::-1]
 
-        # Also make a cut on very small pT constituents
-        small_pt = np.asarray(pt_sort < -20).nonzero()
+        # Also make a cut on very small pT constituents (less than 100 MeV)
+        small_pt = np.asarray(pt_sort < 100).nonzero()
         pt_sort[small_pt] = 0
         eta_sort[small_pt] = 0
         phi_sort[small_pt] = 0
