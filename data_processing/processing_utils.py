@@ -46,6 +46,7 @@ def find_cut_len(filename, cuts):
 
 def find_cut_len_new(filename, cut_branches, svb):
 
+    print(filename)
     # Load information needed to make cuts
     events = uproot.open(filename)
     arrays = events.arrays(filter_name=cut_branches)
@@ -56,7 +57,7 @@ def find_cut_len_new(filename, cut_branches, svb):
         sc = signal_cuts(arrays)
         cuts = np.logical_and(cuts, sc)
 
-    return cuts.count_nonzero()
+    return np.count_nonzero(cuts)
 
 
 def find_h5_len(filename):
@@ -396,27 +397,27 @@ def common_cuts(batch):
 
     # Assemble boolean arrays
     cuts = []
-    cuts.append(abs(batch['fatjet_truth_eta']) < 2.0)
-    cuts.append(batch['fatjet_truth_pt'] / 1000. > 350.)
-    cuts.append(batch['fatjet_numConstituents'] > 3)
-    cuts.append(batch['fatjet_m'] / 1000. > 40.)
+    cuts.append(abs(batch['fjet_truthJet_eta']) < 2.0)
+    cuts.append(batch['fjet_truthJet_pt'] / 1000. > 350.)
+    cuts.append(batch['fjet_numConstituents'] > 3)
+    cuts.append(batch['fjet_m'] / 1000. > 40.)
 
     # Going to also include cuts on hl var exit codes here
-    cuts.append(batch['fatjet_Tau1_wta'] != -999)
-    cuts.append(batch['fatjet_Tau2_wta'] != -999)
-    cuts.append(batch['fatjet_Tau3_wta'] != -999)
-    cuts.append(batch['fatjet_Tau4_wta'] != -999)
-    cuts.append(batch['fatjet_Split12'] != -999)
-    cuts.append(batch['fatjet_Split23'] != -999)
-    cuts.append(batch['fatjet_ECF1'] != -999)
-    cuts.append(batch['fatjet_ECF2'] != -999)
-    cuts.append(batch['fatjet_ECF3'] != -999)
-    cuts.append(batch['fatjet_C2'] != -999)
-    cuts.append(batch['fatjet_D2'] != -999)
-    cuts.append(batch['fatjet_Qw'] != -999)
-    cuts.append(batch['fatjet_L2'] != -999)
-    cuts.append(batch['fatjet_L3'] != -999)
-    cuts.append(batch['fatjet_ThrustMaj'] != -999)
+    cuts.append(batch['fjet_Tau1_wta'] != -999)
+    cuts.append(batch['fjet_Tau2_wta'] != -999)
+    cuts.append(batch['fjet_Tau3_wta'] != -999)
+    cuts.append(batch['fjet_Tau4_wta'] != -999)
+    cuts.append(batch['fjet_Split12'] != -999)
+    cuts.append(batch['fjet_Split23'] != -999)
+    cuts.append(batch['fjet_ECF1'] != -999)
+    cuts.append(batch['fjet_ECF2'] != -999)
+    cuts.append(batch['fjet_ECF3'] != -999)
+    cuts.append(batch['fjet_C2'] != -999)
+    cuts.append(batch['fjet_D2'] != -999)
+    cuts.append(batch['fjet_Qw'] != -999)
+    cuts.append(batch['fjet_L2'] != -999)
+    cuts.append(batch['fjet_L3'] != -999)
+    cuts.append(batch['fjet_ThrustMaj'] != -999)
 
     # Take and of all cuts
     total_cuts = np.logical_and.reduce(cuts)
@@ -437,12 +438,12 @@ def signal_cuts(batch):
 
     # Assemble boolean arrays
     cuts = []
-    cuts.append(abs(batch['fatjet_truth_dRmatched_particle_flavor']) == 6)
-    cuts.append(abs(batch['fatjet_truth_dRmatched_particle_dR']) < 0.75)
-    cuts.append(abs(batch['fatjet_truth_dRmatched_particle_dR_top_W_matched']) < 0.75)
-    cuts.append(batch['fatjet_ungroomed_truth_m'] / 1000. > 140.)
-    cuts.append(batch['fatjet_truth_ungroomedParent_GhostBHadronsFinalCount'] >= 1)
-    cuts.append(batch['fatjet_ungroomed_truth_Split23'] / 1000. > np.exp(3.3-6.98e-4*batch['fatjet_ungroomed_truth_pt']/1000.))
+    cuts.append(abs(batch['fjet_truth_dRmatched_particle_flavor']) == 6)
+    cuts.append(abs(batch['fjet_truth_dRmatched_particle_dR']) < 0.75)
+    cuts.append(abs(batch['fjet_truthJet_dRmatched_particle_dR_top_W_matched']) < 0.75)
+    cuts.append(batch['fjet_ungroomed_truthJet_m'] / 1000. > 140.)
+    cuts.append(batch['fjet_truthJet_ungroomedParent_GhostBHadronsFinalCount'] >= 1)
+    cuts.append(batch['fjet_ungroomed_truthJet_Split23'] / 1000. > np.exp(3.3-6.98e-4*batch['fjet_ungroomed_truthJet_pt']/1000.))
 
     # Take and of all cuts
     total_cuts = np.logical_and.reduce(cuts)

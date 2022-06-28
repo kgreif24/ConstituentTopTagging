@@ -9,10 +9,14 @@ Last updated 6/28/2022
 python3
 """
 
+import time
+import numpy as np
 import processing_utils as pu
 
 class RootConverter:
-    """ RootConverter -
+    """ RootConverter - This class' methods handle the conversion of jet
+    data from .root files to .h5 files which can be shuffled and combined
+    to form jet tagging datasets.
     """
 
     def __init__(self, setup_dict):
@@ -32,12 +36,14 @@ class RootConverter:
         # Because files come from different pt slices, we need to pull a
         # representative sample of each file for our train/test data sets.
         # Find number of jets we expect to pull from each file
-        cb = self.params['cut_branches']
+        cb = self.params['cut_branches'] + self.params['hl_branches']
         svb = self.params['svb_flag']
-        raw_file_events = [pu.find_cut_len_new(name, cb, svb) for name in files]
+        start = time.time()
+        raw_file_events = [pu.find_cut_len_new(name, cb, svb) for name in self.files]
+        print("Cut calculation took: ", time.time() - start)
         raw_events = np.sum(raw_file_events)
         print("We have", raw_events, "jets in total")
-        print("We wish to keep", total_events, "of these jets")
+        print("We wish to keep", self.params['total_events'], "of these jets")
 
 
 
@@ -46,7 +52,7 @@ if __name__ == '__main__':
     # Define convert_dict which is passed to RootConverter class
     convert_dict = {
         'svb_flag': True,
-        'source_list': './dat/ZprimeTTSamples.list',
+        'source_list': './dat/sig_test.list',
         'tree_name': ':FlatSubstructureJetTree',
         'rw_type': 'w',
         'max_constits': 200,
@@ -70,12 +76,11 @@ if __name__ == '__main__':
         'jet_branches': ['fjet_pt', 'fjet_eta', 'fjet_phi', 'fjet_m'],
         'label_name': 'labels',
         'cut_branches': [
-            'fatjet_truth_eta', 'fatjet_truth_pt', 'fatjet_numConstituents', 'fatjet_m',
-            'fatjet_truth_dRmatched_particle_flavor', 'fatjet_truth_dRmatched_particle_dR',
-            'fatjet_truth_dRmatched_particle_dR_top_W_matched', 'fatjet_ungroomed_truth_m',
-            'fatjet_truth_ungroomedParent_GhostBHadronsFinalCount', 'fatjet_ungroomed_truth_Split23',
-            'fatjet_ungroomed_truth_pt', 'fatjet_ungroomed_truth_ghostNTop',
-            'ttbar_deltaR_rapidity'
+            'fjet_truthJet_eta', 'fjet_truthJet_pt', 'fjet_numConstituents', 'fjet_m',
+            'fjet_truth_dRmatched_particle_flavor', 'fjet_truth_dRmatched_particle_dR',
+            'fjet_truthJet_dRmatched_particle_dR_top_W_matched', 'fjet_ungroomed_truthJet_m',
+            'fjet_truthJet_ungroomedParent_GhostBHadronsFinalCount', 'fjet_ungroomed_truthJet_Split23',
+            'fjet_ungroomed_truthJet_pt'
         ]
     }
 
