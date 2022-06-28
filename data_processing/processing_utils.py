@@ -29,7 +29,7 @@ def find_raw_len(filename):
     return ak.num(events['fjet_pt'], axis=0)
 
 def find_cut_len(filename, cuts):
-    """ find_cut_len - Take in a path to a .root file and returns the number of 
+    """ find_cut_len - Take in a path to a .root file and returns the number of
     events in that file that will pass a set of cuts.
 
     Arguments:
@@ -44,13 +44,28 @@ def find_cut_len(filename, cuts):
     arrays = events.arrays("fjet_pt", cut=cuts)
     return ak.num(arrays['fjet_pt'], axis=0)
 
+def find_cut_len_new(filename, cut_branches, svb):
+
+    # Load information needed to make cuts
+    events = uproot.open(filename)
+    arrays = events.arrays(filter_name=cut_branches)
+
+    # Call appropriate cut functions on the loaded arrays
+    cuts = common_cuts(arrays)
+    if svb == True:
+        sc = signal_cuts(arrays)
+        cuts = np.logical_and(cuts, sc)
+
+    return cuts.count_nonzero()
+
+
 def find_h5_len(filename):
-    """ find_h5_len - Take in a path to a .h5 file and returns the length of 
+    """ find_h5_len - Take in a path to a .h5 file and returns the length of
     the labels dataset.
 
     Arguments:
     filename (string) - The path to the file
-    
+
     Returns
     (int) - The length of the labels dataset
     """
@@ -94,13 +109,13 @@ def flat_weights(pt, n_bins=200, **kwargs):
 def match_weights(pt, target, n_bins=200):
     """ match_weights - This function will use the hepml reweight function
     to calculate weights which match the pt distribution to the target
-    distribution. Usually used to match the bkg pt distribution to the 
+    distribution. Usually used to match the bkg pt distribution to the
     signal.
 
     Arguments:
     pt (array) - Distribution to calculate weights for
     target (array) - Distribution to match
-    n_bins (int) 
+    n_bins (int)
 
     Returns:
     (array) - vector of weights for pt
@@ -109,7 +124,7 @@ def match_weights(pt, target, n_bins=200):
     # Fit reweighter to target distribution
     reweighter = reweight.BinsReweighter(n_bins=n_bins)
     reweighter.fit(pt, target=target)
-    
+
     # Predict new weights
     weights = reweighter.predict_weights(pt)
     weights /= weights.mean()
@@ -118,13 +133,13 @@ def match_weights(pt, target, n_bins=200):
 
 
 def calc_weights(file, weight_func):
-    """ calc_weights - This function calculates weights to adjust the pT spectrum of 
+    """ calc_weights - This function calculates weights to adjust the pT spectrum of
     the h5 file passed in as arguments. Applies the weight calculation function
     given by weight_func. This function takes pt as an argument and returns weights.
 
     Arguments:
     file (obj) - The file to calculate weights for, must be writable
-    weight_func (function) - The function used to calculate weights. Must take in a 
+    weight_func (function) - The function used to calculate weights. Must take in a
     vector of jet pt and return jet weights.
 
     Returns:
@@ -219,13 +234,13 @@ def send_data(file_list, target, hl_means, hl_stddevs):
         for var, mean, stddev in zip(hl_branches, hl_means, hl_stddevs):
             this_var = file[var][:]
             branch_shuffle(this_var, seed=rseed)
-            
+
             # Catch for annoying ECF functions which have large magnitudes
             if var == 'fjet_ECF3':
                 this_var /= 1e10
             elif var == 'fjet_ECF2':
                 this_var /= 1e6
-            
+
             # Standardize variable using information passed in as argument
             stan_var = (this_var - mean) / stddev
             hlvars_list.append(stan_var)
@@ -254,7 +269,7 @@ def send_data(file_list, target, hl_means, hl_stddevs):
 
 def unstacked_send(file_list, target):
     """ unstacked_send - The same function as above, except it skips the stacking
-    and hl variable standardization steps. This is for use in generating the 
+    and hl variable standardization steps. This is for use in generating the
     public facing data set.
 
     Arguments:
@@ -316,13 +331,13 @@ def branch_shuffle(branch, seed=42):
     Returns:
     None - array is shuffled in place
     """
-    
+
     rng = np.random.default_rng(seed)
     rng.shuffle(branch, axis=0)
 
 
 def calc_standards(file):
-    """ calc_standards - This function will calculate the mean and std. deviation of each 
+    """ calc_standards - This function will calculate the mean and std. deviation of each
     high level variable in a given .h5 file. It will return these standards as two lists.
 
     Arguments:
@@ -410,7 +425,7 @@ def common_cuts(batch):
 
 
 def signal_cuts(batch):
-    """ signal_cuts - Identical to the above common cuts, but applies the rel 22.0 
+    """ signal_cuts - Identical to the above common cuts, but applies the rel 22.0
     signal cuts.
 
     Arguments:
@@ -436,7 +451,7 @@ def signal_cuts(batch):
 
 
 def count_sig(raw_batch, sig=False):
-    """ This function will count the number of jets in a raw batch (loaded from 
+    """ This function will count the number of jets in a raw batch (loaded from
     nTuple before flattening) after applying signal or common cuts.
 
     Arguments:
@@ -458,5 +473,3 @@ def count_sig(raw_batch, sig=False):
 
     # Return the number of trues in boolean array
     return np.count_nonzero(cuts)
-
-    
