@@ -1,16 +1,48 @@
 """ preprocessing.py - This script will define functions that can be used
-to pre-preprocess the constituent level information coming from the raw 
-nTuples. Different pre-processing schemes can be applied easily by 
+to pre-preprocess the constituent level information coming from the raw
+nTuples. Different pre-processing schemes can be applied easily by
 calling different functions from this module.
 
 Author: Kevin Greif
-Last updated 11/12/21
-python3 
+Last updated 6/29/22
+python3
 """
 
 import numpy as np
 import awkward as ak
 
+
+def raw_preprocess(jets, sort_indeces, zero_indeces, params):
+    """ raw_preprocess - This preprocessing function applies to minimal
+    preprocessing used in the public facing data sets.
+
+    args and returns are standard (see above)
+    """
+
+    # Initialize preprocess dict
+    preprocess = {}
+
+    # Loop through target constituents
+    for name in params['t_constit_branches']:
+
+        # Get branch
+        branch = jets[name]
+
+        # Zero pad
+        temp = ak.pad_none(branch, max_constits, axis=1, clip=True)
+        temp = ak.to_numpy(ak.fill_none(temp, 0, axis=None))
+
+        # Set small pT constituents to zero
+        temp[small_pt] = 0
+
+        # We sort by DECREASING pT, which necessitates complicated indexing
+        temp = np.take_along_axis(temp, sort, axis=1)[:,::-1]
+
+        # Write to batch dict
+        preprocess[name] = temp
+
+    # Finally we return dict
+    return preprocess
 
 def energy_norm(jets, indeces, max_constits=200, **kwargs):
     """ energy_norm - Defines the standard energy constituent preprocessing,
@@ -23,7 +55,7 @@ def energy_norm(jets, indeces, max_constits=200, **kwargs):
     pt and energy. Usually a batch of a loop over a .root file using uproot.
     indeces (array): The indeces which will sort the constituents by INCREASING pt. Sort
     will be reflected to sort by decreasing pt.
-    max_constits (int): The number of constituents to keep in our jets. Jets shorter 
+    max_constits (int): The number of constituents to keep in our jets. Jets shorter
     than this will be zero padded, jets longer than this will be truncated.
 
     Returns:
@@ -60,7 +92,7 @@ def energy_norm(jets, indeces, max_constits=200, **kwargs):
     # Sort by decreasing pt
     en_sort = np.take_along_axis(en_zero, indeces, axis=1)[:,::-1]
 
-    
+
     # Now simply return preprocessed pt/energy
     return pt_sort, en_sort
 
@@ -77,7 +109,7 @@ def log_norm(jets, name, indeces, max_constits=200, **kwargs):
     to this element of the jets dict.
     indeces (array): The indeces which will sort the constituents by INCREASING pt. Sort
     will be reflected to sort by decreasing pt.
-    max_constits (int): The number of constituents to keep in our jets. Jets shorter 
+    max_constits (int): The number of constituents to keep in our jets. Jets shorter
     than this will be zero padded, jets longer than this will be truncated.
 
     Returns:
@@ -119,13 +151,13 @@ def simple_angular(jets, indeces, max_constits=200, **kwargs):
     eta and phi. Usually a batch of a loop over a .root file using uproot.
     indeces (array): The indeces which will sort the constituents by INCREASING pt. Sort
     will be reflected to sort by decreasing pt.
-    max_constits (int): The number of constituents to keep in our jets. Jets shorter 
+    max_constits (int): The number of constituents to keep in our jets. Jets shorter
     than this will be zero padded, jets longer than this will be truncated.
 
     Returns:
     (array) - A zero padded array giving the preprocessed eta values. It's shape will
     be (num_jets, max_constits)
-    (array) - A zero padded array giving the preprocessed phi values. 
+    (array) - A zero padded array giving the preprocessed phi values.
     """
 
     # Need to center/rotate/flip constituents BEFORE zero padding.
@@ -133,7 +165,7 @@ def simple_angular(jets, indeces, max_constits=200, **kwargs):
     phi = jets['fjet_clus_phi']
 
     # 1. Center hardest constituent in eta/phi plane
-    # Find the eta/phi coordinates of hardest constituent in each jet, going to 
+    # Find the eta/phi coordinates of hardest constituent in each jet, going to
     # need some fancy indexing
     ax_index = np.arange(0, len(eta), 1)
     first_eta = eta[ax_index, indeces[:,-1]]
@@ -170,7 +202,7 @@ def simple_angular(jets, indeces, max_constits=200, **kwargs):
     eta_sort = np.take_along_axis(eta_zero, indeces, axis=1)[:,::-1]
     phi_sort = np.take_along_axis(phi_zero, indeces, axis=1)[:,::-1]
 
-    
+
     # Finished preprocessing. Return results
     return eta_sort, phi_sort
 
@@ -209,8 +241,3 @@ if __name__ == '__main__':
     print("\nPreprocessed angular")
     print(eta_pp)
     print(phi_pp)
-    
-    
-
-
-

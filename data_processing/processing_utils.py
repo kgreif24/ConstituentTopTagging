@@ -27,26 +27,21 @@ def find_raw_len(filename):
 
     events = uproot.open(filename)
     return ak.num(events['fjet_pt'], axis=0)
+    
 
-def find_cut_len(filename, cuts):
+def find_cut_len(filename, cut_branches, svb):
     """ find_cut_len - Take in a path to a .root file and returns the number of
     events in that file that will pass a set of cuts.
 
     Arguments:
     filename (string) - The path to the file (including tree name)
-    cuts (string) - Cuts to apply to filter events
+    cuts (list) - List of branches needed to calculate cuts
+    svb (bool) - Flag for running signal or background cuts
 
     Returns
     (int) - The number of events in file that will pass cuts
     """
 
-    events = uproot.open(filename)
-    arrays = events.arrays("fjet_pt", cut=cuts)
-    return ak.num(arrays['fjet_pt'], axis=0)
-
-def find_cut_len_new(filename, cut_branches, svb):
-
-    print(filename)
     # Load information needed to make cuts
     events = uproot.open(filename)
     arrays = events.arrays(filter_name=cut_branches)
