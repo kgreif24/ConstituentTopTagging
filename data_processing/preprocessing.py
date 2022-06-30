@@ -29,14 +29,14 @@ def raw_preprocess(jets, sort_indeces, zero_indeces, params):
         branch = jets[name]
 
         # Zero pad
-        temp = ak.pad_none(branch, max_constits, axis=1, clip=True)
+        temp = ak.pad_none(branch, params['max_constits'], axis=1, clip=True)
         temp = ak.to_numpy(ak.fill_none(temp, 0, axis=None))
 
         # Set small pT constituents to zero
-        temp[small_pt] = 0
+        temp[zero_indeces] = 0
 
         # We sort by DECREASING pT, which necessitates complicated indexing
-        temp = np.take_along_axis(temp, sort, axis=1)[:,::-1]
+        temp = np.take_along_axis(temp, sort_indeces, axis=1)[:,::-1]
 
         # Write to batch dict
         preprocess[name] = temp

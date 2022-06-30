@@ -9,8 +9,10 @@ Last updated 6/28/2022
 python3
 """
 
-import time
 import numpy as np
+import h5py
+import uproot
+import awkward as ak
 import processing_utils as pu
 import preprocessing as pp
 
@@ -44,13 +46,13 @@ class RootConverter:
         raw_file_events = [pu.find_cut_len(name, cb, svb) for name in self.files]
         self.raw_file_events = np.array(raw_file_events)
         self.raw_events = np.sum(self.raw_file_events)
-        print("We have", raw_events, "jets in total")
+        print("We have", self.raw_events, "jets in total")
         print("We wish to keep", self.params['total'], "of these jets")
 
         # If statement to catch case where we request more jets than we have
-        if self.params['total'] > raw_events:
-            self.params['total'] = raw_events
-            print("Only have", raw_events, "jets, so keep this many")
+        if self.params['total'] > self.raw_events:
+            self.params['total'] = self.raw_events
+            print("Only have", self.raw_events, "jets, so keep this many")
 
         # Find number of jets we actually want to pull from each file
         fractions = self.raw_file_events / self.raw_events
@@ -72,6 +74,11 @@ class RootConverter:
         Returns:
         None
         """
+
+        if self.params['rw_type'] == 'w':
+            print("Building .h5 files")
+        else:
+            print("Loading .h5 files")
 
         # Initialize list to accept file objects
         self.h5files = []
@@ -141,10 +148,10 @@ class RootConverter:
         self.write_events = np.zeros(self.params['n_targets'])
 
         print("\nStarting processing loop...")
-        print("Initial write positions:", start_index)
+        print("Initial write positions:", self.start_index)
 
         # Loop through source files
-        for num_source, ifile in enumerate(self.h5files):
+        for num_source, ifile in enumerate(self.files):
 
             # Open file using uproot
             print("\nNow processing file", ifile)
@@ -157,6 +164,9 @@ class RootConverter:
             hit_file_limit = False
 
             # Iterate through the files using iterate, filtering out only branches we need
+            keep_branches = (self.params['s_constit_branches'] + self.params['hl_branches']
+                             + self.params['jet_branches'])
+            source_branches = keep_branches + self.params['cut_branches']
             for jet_batch in events.iterate(step_size="200 MB",
                                             filter_name=source_branches):
 
@@ -165,18 +175,18 @@ class RootConverter:
 
                 ##################### Make Cuts #####################
 
-                cuts = processing_utils.common_cuts(jet_batch)
+                cuts = pu.common_cuts(jet_batch)
                 if self.params['svb_flag']:
-                    sc = processing_utils.signal_cuts(jet_batch)
+                    sc = pu.signal_cuts(jet_batch)
                     cuts = np.logical_and(cuts, sc)
-                cut_batch = {kw: branch[cuts,...] for kw, branch in flat_batch.items()}
+                cut_batch = {kw: jet_batch[kw][cuts,...] for kw in keep_branches}
 
                 ################### Constituents ####################
 
                 # Get indeces to sort by increasing pt (will be inverted later)
                 pt_name = self.params['pt_name']
                 pt = cut_batch[pt_name]
-                pt_zero = ak.pad_none(pt, max_constits, axis=1, clip=True)
+                pt_zero = ak.pad_none(pt, self.params['max_constits'], axis=1, clip=True)
                 pt_zero = ak.to_numpy(ak.fill_none(pt_zero, 0, axis=None))
                 sort_indeces = np.argsort(pt_zero, axis=1)
 
@@ -224,11 +234,11 @@ class RootConverter:
                 ##################### Write ########################
 
                 # Check if this batch will go over file limit
-                if jets_from_file + batch_length >= self.limits[num_source]:
+                if jets_from_file + batch_length > self.limits[num_source]:
                     print("Have written", jets_from_file, "jets")
-                    print("Would write", batch_length, "jets")
-                    print("Reached limit of", self.limits[num_source], "jets")
-                    batch_length = self.limits - jets_from_file
+                    print("We have", batch_length, "jets in this batch")
+                    print("This puts us over limit of", self.limits[num_source], "jets")
+                    batch_length = self.limits[num_source] - jets_from_file
                     print("Instead write", batch_length, "jets")
 
                     # Set break flag
@@ -271,7 +281,7 @@ class RootConverter:
         for name, branch in batch.items():
 
             # Split branch into n_targets pieces using np.array_split
-            branch_splits = np.array_split(batch[:length,...], self.params['n_targets'])
+            branch_splits = np.array_split(branch[:length,...], self.params['n_targets'])
 
             # Find length of each split and end indeces for writing
             split_lengths = [split.shape[0] for split in branch_splits]
@@ -291,7 +301,7 @@ class RootConverter:
         self.start_index = end_index
 
 
-    def trim_zeros():
+    def trim_zeros(self):
         """ trim_zeros - Resizes all target .h5 files to the numbers contained
         in self.start_index. This function should only be called after the
         process function, and only when this is the last writing run (i.e.
@@ -307,7 +317,7 @@ class RootConverter:
             print("Now processing target file number", str(file_num))
 
             # Find appropriate size for datasets in this file
-            constits_size = (self.start_index[file_num], max_constits)
+            constits_size = (self.start_index[file_num], self.params['max_constits'])
             hl_size = (self.start_index[file_num],)
 
             # Loop through all target branches and resize
@@ -336,8 +346,8 @@ class RootConverter:
         # Print a summary
         print("\nAt end of building files:")
         print("Expected", self.params['total'], "jets")
-        print("Wrote", np.sum(self.write_events), "jets")
-        print("H5 jets written breakdown:", write_events)
+        print("Wrote", int(np.sum(self.write_events)), "jets")
+        print("H5 jets written breakdown:", self.write_events)
         print("H5 jets total breakdown:", self.start_index)
 
 
@@ -348,13 +358,13 @@ if __name__ == '__main__':
     # Define convert_dict which is passed to RootConverter class
     convert_dict = {
         'svb_flag': True,
-        'trim': False,
+        'trim': True,
         'source_list': './dat/sig_test.list',
         'tree_name': ':FlatSubstructureJetTree',
         'rw_type': 'w',
         'max_constits': 200,
-        'target_dir': './dataloc/intermediates_mc/',
-        'n_targets': 36,
+        'target_dir': './dataloc/intermediates_test/',
+        'n_targets': 4,
         'total': 22375114,
         's_constit_branches': [
             'fjet_clus_pt', 'fjet_clus_eta',
