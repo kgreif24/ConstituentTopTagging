@@ -356,6 +356,7 @@ class RootConverter:
 if __name__ == '__main__':
 
     # Define convert_dict which is passed to RootConverter class
+    # This particular dict is set up to do raw conversion (no preprocessing)
     convert_dict = {
         'svb_flag': True,
         'trim': True,
