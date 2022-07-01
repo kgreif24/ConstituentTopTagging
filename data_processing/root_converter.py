@@ -12,9 +12,11 @@ python3
 import numpy as np
 import h5py
 import uproot
+import ROOT
 import awkward as ak
 import processing_utils as pu
 import preprocessing as pp
+import syst_variations as syst
 
 class RootConverter:
     """ RootConverter - This class' methods handle the conversion of jet
@@ -62,6 +64,12 @@ class RootConverter:
         if np.sum(self.limits) != self.params['total']:
             self.params['total'] = np.sum(self.limits)
             print("Due to rounding we will instead keep", self.params['total'], "jets")
+
+        # Lastly load cluster systematics map, if needed.
+        # Simply hard code the location of the systematics map on gpatlas
+        if self.params['syst_func'] != None:
+            syst_loc = '/DFS-L/DATA/whiteson/kgreif/SystTaggingData/cluster_uncert_map_EM.root')
+            self.syst_map = ROOT.TFile(syst_loc, 'read')
 
 
     def build_files(self, max_size=4000000):
@@ -132,7 +140,7 @@ class RootConverter:
         constituents which will be set to 0, and the params dictionary of the
         RootConverter class.
 
-        This must return the preprocesed branches to be written to the target
+        This must return the preprocessed branches to be written to the target
         files.
 
         All functions are written in the
@@ -180,6 +188,14 @@ class RootConverter:
                     sc = pu.signal_cuts(jet_batch)
                     cuts = np.logical_and(cuts, sc)
                 cut_batch = {kw: jet_batch[kw][cuts,...] for kw in keep_branches}
+
+                #################### Apply Systs ####################
+
+                if self.params['syst_func'] != None:
+
+                    var_func = self.params(['syst_func'])
+                    var_batch = var_func(cut_batch, self.syst_map)
+                    cut_batch.update(var_batch)
 
                 ################### Constituents ####################
 
@@ -367,6 +383,7 @@ if __name__ == '__main__':
         'target_dir': './dataloc/intermediates_test/',
         'n_targets': 4,
         'total': 22375114,
+        'syst_func': syst.reco_efficiency,
         's_constit_branches': [
             'fjet_clus_pt', 'fjet_clus_eta',
             'fjet_clus_phi', 'fjet_clus_E'
