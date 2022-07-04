@@ -5,7 +5,7 @@ subsequently be built by shuffling the .h5 output files. See README of
 data_processing submodule for details.
 
 Author: Kevin Greif
-Last updated 6/28/2022
+Last updated 7/1/2022
 python3
 """
 
@@ -68,7 +68,7 @@ class RootConverter:
         # Lastly load cluster systematics map, if needed.
         # Simply hard code the location of the systematics map on gpatlas
         if self.params['syst_func'] != None:
-            syst_loc = '/DFS-L/DATA/whiteson/kgreif/SystTaggingData/cluster_uncert_map_EM.root')
+            syst_loc = '/DFS-L/DATA/whiteson/kgreif/SystTaggingData/cluster_uncert_map_EM.root'
             self.syst_map = ROOT.TFile(syst_loc, 'read')
 
 
@@ -193,8 +193,9 @@ class RootConverter:
 
                 if self.params['syst_func'] != None:
 
-                    var_func = self.params(['syst_func'])
-                    var_batch = var_func(cut_batch, self.syst_map)
+                    var_batch = self.params['syst_func'](cut_batch, 
+                                                         self.syst_map, 
+                                                         self.params['s_constit_branches'])
                     cut_batch.update(var_batch)
 
                 ################### Constituents ####################
@@ -376,17 +377,18 @@ if __name__ == '__main__':
     convert_dict = {
         'svb_flag': True,
         'trim': True,
-        'source_list': './dat/sig_test.list',
+        'source_list': './dat/taste_test.list',
         'tree_name': ':FlatSubstructureJetTree',
         'rw_type': 'w',
         'max_constits': 200,
         'target_dir': './dataloc/intermediates_test/',
-        'n_targets': 4,
+        'n_targets': 1,
         'total': 22375114,
         'syst_func': syst.reco_efficiency,
         's_constit_branches': [
             'fjet_clus_pt', 'fjet_clus_eta',
-            'fjet_clus_phi', 'fjet_clus_E'
+            'fjet_clus_phi', 'fjet_clus_E',
+            'fjet_clus_taste'
         ],
         'pt_name': 'fjet_clus_pt',
         'hl_branches': [
@@ -397,7 +399,8 @@ if __name__ == '__main__':
             'fjet_ThrustMaj'
         ],
         't_constit_branches': [
-            'fjet_clus_eta', 'fjet_clus_phi', 'fjet_clus_pt', 'fjet_clus_E'
+            'fjet_clus_eta', 'fjet_clus_phi', 'fjet_clus_pt', 'fjet_clus_E',
+            'fjet_clus_taste'
         ],
         'jet_branches': ['fjet_pt', 'fjet_eta', 'fjet_phi', 'fjet_m'],
         'label_name': 'labels',

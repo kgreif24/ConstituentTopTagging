@@ -15,7 +15,7 @@ python3
 import awkward as ak
 import numpy as np
 
-def reco_efficiency(jets, uncert_map):
+def reco_efficiency(jets, uncert_map, constit_branches):
     """ reco_efficiency - This function applies the cluster reconstruction
     efficiency systematic variation to the constituent level inputs contained
     in the jet batch.
@@ -23,6 +23,9 @@ def reco_efficiency(jets, uncert_map):
     Arguments:
     jets (dict): The jet batch, almost always as defined in the root converter
     class after cuts have been applied. See root_converter.py for details.
+    uncert_map (TFile): The uncertaintiy map file object loaded using PyROOT
+    constit_branches (list): The names of the constituent branches to apply 
+    variation on.
 
     Returns:
     (dict): A dictionary containing the constituent level quantities with
@@ -40,7 +43,7 @@ def reco_efficiency(jets, uncert_map):
     # We will write boolean values to an awkward array using ak.ArrayBuilder.
     # This array can then be used to index the constituent arrays and drop
     # the unwanted constituents
-    n_jets = len(jets)
+    n_jets = len(en)
     n_constits = ak.count(en, axis=1)
 
     # Initialize builder
@@ -50,21 +53,20 @@ def reco_efficiency(jets, uncert_map):
     for i in range(n_jets):
 
         # Add list to builder
-        build.begin_list()
+        builder.begin_list()
 
         # Constituent loop
         for j in range(n_constits[i]):
 
             # Get constituents energy, eta, and taste
-            cons_en = en[j]
+            cons_en = en[i,j]
             cons_eta = abs(jets['fjet_clus_eta'][i,j])
             cons_taste = jets['fjet_clus_taste'][i,j]
 
             # If constituent is not neutral (taste == 1), immediately write
             # True and skip to next
             if cons_taste != 1:
-                build.append(True)
-                print("Charged constituent, skip!")
+                builder.append(True)
                 continue
 
             # Get energy and eta bins
@@ -84,7 +86,7 @@ def reco_efficiency(jets, uncert_map):
 
             # If we have bin content, divide cluster energy by scale
             if (cluster_scale.GetBinContent(Ebin, ebin) > 0):
-                p = E / cluster_scale.GetBinContent(Ebin, ebin)
+                p = cons_en / cluster_scale.GetBinContent(Ebin, ebin)
 
             # Now find r, depending on the value of eta
             if (cons_eta < 0.6):
@@ -108,7 +110,10 @@ def reco_efficiency(jets, uncert_map):
             flip = rng.uniform()
 
             # Accept or reject constituent
-            if ((flip < r) and (E / 1000 < 2.5)):
+            print("\np:", p)
+            print("r:", r)
+            print("flip:", flip)
+            if ((flip < r) and (cons_en / 1000 < 2.5)):
                 builder.append(False)
                 print("Dropped")
             else:
@@ -124,6 +129,6 @@ def reco_efficiency(jets, uncert_map):
     keep = builder.snapshot()
 
     # Index all constituent level branches, dropping the required constituents
-    var_dict = {kw: branch[keep] for kw, branch in jets.items()}
+    var_dict = {kw: jets[kw][keep] for kw in constit_branches}
 
     return var_dict
