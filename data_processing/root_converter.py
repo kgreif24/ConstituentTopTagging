@@ -193,8 +193,8 @@ class RootConverter:
 
                 if self.params['syst_func'] != None:
 
-                    var_batch = self.params['syst_func'](cut_batch, 
-                                                         self.syst_map, 
+                    var_batch = self.params['syst_func'](cut_batch,
+                                                         self.syst_map,
                                                          self.params['s_constit_branches'])
                     cut_batch.update(var_batch)
 
@@ -384,7 +384,7 @@ if __name__ == '__main__':
         'target_dir': './dataloc/intermediates_test/',
         'n_targets': 1,
         'total': 22375114,
-        'syst_func': syst.reco_efficiency,
+        'syst_func': syst.energy_scale,
         's_constit_branches': [
             'fjet_clus_pt', 'fjet_clus_eta',
             'fjet_clus_phi', 'fjet_clus_E',
