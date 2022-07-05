@@ -235,8 +235,8 @@ def energy_scale(jets, uncert_map, constit_branches, direction='up'):
 
             # Calculate new energy
             Eces = ptces * np.cosh(cons_eta)
-            print("\nOld pT:{0:.4f}\tOld en:{0:.4f}".format(cons_pt, cons_en))
-            print("New pT:{0:0.4f}\tNew en:{0:.4f}".format(ptcest, Eces))
+            print("\nOld pT: {0:.4f}\tOld en: {1:.4f}".format(cons_pt, cons_en))
+            print("New pT: {0:0.4f}\tNew en: {1:.4f}".format(ptces, Eces))
 
             # Add new values to array builders
             p_builder.append(ptces)
