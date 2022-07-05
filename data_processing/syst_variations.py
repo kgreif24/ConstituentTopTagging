@@ -5,10 +5,12 @@ the root converter class to produce data set with applied systematics.
 Currently, the variations implemented are the EM scale cluster uncertainties.
 
 For now, we hard code the names of constituent level branches in the jet
-batches. (e.g. 'fjet_clus_E').
+batches. (e.g. 'fjet_clus_E'). Or we should, refactor this!
+
+Large amounts of duplicated code currently in this file. Refactoring needed!
 
 Author: Kevin Greif
-Last updated 7/1/22
+Last updated 7/5/22
 python3
 """
 
@@ -241,6 +243,124 @@ def energy_scale(jets, uncert_map, constit_branches, direction='up'):
             # Add new values to array builders
             p_builder.append(ptces)
             E_builder.append(Eces)
+
+        # End constituent loop
+        # Close builder lists
+        p_builder.end_list()
+        E_builder.end_list()
+
+    # End jet loop
+    # Take snapshots of builders
+    var_pt = p_builder.snapshot()
+    var_en = E_builder.snapshot()
+
+    # Return dictionary with varied pT and energy information
+    return {'fjet_clus_pt': var_pt, 'fjet_clus_E': var_en}
+
+def energy_res(jets, uncert_map, constit_branches):
+    """ energy_res - This function applies the cluster energy resolution
+    variation to the constituent level inputs.
+
+    Arguments:
+    jets (dict): The jet batch, almost always as defined in the root converter
+    class after cuts have been applied. See root_converter.py for details.
+    uncert_map (TFile): The uncertaintiy map file object loaded using PyROOT
+    constit_branches (list): The names of the constituent branches to apply
+    variation on.
+    direction (string): Either 'up' or 'down' to control which direction we
+    apply the systematic variation.
+
+    Returns:
+    (dict): A dictionary containing the constituent level quantities with
+    applies systematic variation.
+    """
+
+    # Get cluster energy scale and RMS from uncert map
+    cluster_scale = uncert_map.Get('Scale')
+    cluster_rms = uncert_map.Get('RMS')
+
+    # Convert energy to GeV
+    en = jets['fjet_clus_E'] / 1000
+
+    # Loop over jet constituents
+    # Instead of building an awkard array with boolean values, we directly
+    # build the new pT and energy values for the constituents
+    n_jets = len(en)
+    n_constits = ak.count(en, axis=1)
+
+    # Initialize 2 akward array builders for the varied pT and energy arrays
+    p_builder = ak.ArrayBuilder()
+    E_builder = ak.ArrayBuilder()
+
+    # Jet loop
+    for i in range(n_jets):
+
+        # Add list to builders
+        p_builder.begin_list()
+        E_builder.begin_list()
+
+        # Constituent loop
+        for j in range(n_constits[i]):
+
+            # Get constituent energy, eta, pT, and taste
+            cons_en = en[i,j]
+            cons_eta = abs(jets['fjet_clus_eta'][i,j])
+            cons_pt = jets['fjet_clus_pt'][i,j]
+            cons_taste = jets['fjet_clus_taste'][i,j]
+
+            # If constituent is not neutral (taste == 1), write nominal values
+            # and skip to next
+            if cons_taste != 1:
+                p_builder.append(cons_pt)
+                E_builder.append(cons_en)
+                continue
+
+            # Get energy and eta bins
+            Ebin = cluster_scale.GetXaxis().FindBin(cons_en)
+            ebin = cluster_scale.GetYaxis().FindBin(cons_eta)
+
+            # Correct overflows
+            if (Ebin > cluster_scale.GetNbinsX()):
+                Ebin = cluster_scale.GetNbinsX()
+            elif (Ebin < 1):
+                Ebin = 1
+
+            if (ebin > cluster_scale.GetNbinsY()):
+                ebin = cluster_scale.GetNbinsY()
+            elif (ebin < 1):
+                ebin = 1
+
+            # If we have bin content, divide cluster energy by scale
+            p = cons_en
+            if (cluster_scale.GetBinContent(Ebin, ebin) > 0):
+                p = cons_en / cluster_scale.GetBinContent(Ebin, ebin)
+
+            # Now get pT bins
+            pbin = cluster_means.GetXaxis().FindBin(cons_pt)
+
+            # Correct overflow
+            if (pbin > cluster_means.GetNbinsX()):
+                pbin = cluster_means.GetNbinsX()
+            elif (pbin < 1):
+                pbin = 1
+
+            # Find CER
+            cer = abs(cluster_rms.GetBinContent(pbin, ebin))
+            if (p > 350):
+                cer = 0.1
+
+            # Apply smearing
+            rng = np.random.default_rng()
+            ptcer = cons_pt * (1 + rng.normal() * cer)
+
+            # Calculate new energy
+            Ecer = ptcer * np.cosh(cons_eta)
+            print("\nOld pT: {0:.4f}\tOld en: {1:.4f}".format(cons_pt, cons_en))
+            print("New pT: {0:0.4f}\tNew en: {1:.4f}".format(ptcer, Ecer))
+
+            # Add new values to array builders
+            p_builder.append(ptcer)
+            E_builder.append(Ecer)
 
         # End constituent loop
         # Close builder lists

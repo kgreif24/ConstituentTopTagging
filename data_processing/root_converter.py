@@ -371,7 +371,7 @@ if __name__ == '__main__':
         'n_targets': 1,
         'total': 22375114,
         'constit_func': pp.raw_preprocess,
-        'syst_func': syst.energy_scale,
+        'syst_func': syst.energy_res,
         's_constit_branches': [
             'fjet_clus_pt', 'fjet_clus_eta',
             'fjet_clus_phi', 'fjet_clus_E',
