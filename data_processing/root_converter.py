@@ -126,28 +126,12 @@ class RootConverter:
             self.h5files.append(file)
 
 
-    def process(self, constit_func=None, **kwargs):
+    def process(self, **kwargs):
         """ process - Loops through the source file list using uproots iterate
         function. Applies cuts and preprocessing to each batch, then splits
         the batch and writes the fragments to .h5 target files.
 
-        Arguments:
-        constit_func (func) - The function that performs the desired pre-
-        processing for this data set.
-
-        This must accept the jet batch, indeces
-        to sort of the constituents by pT, indeces of the small pT
-        constituents which will be set to 0, and the params dictionary of the
-        RootConverter class.
-
-        This must return the preprocessed branches to be written to the target
-        files.
-
-        All functions are written in the
-        preprocessing module.
-
-        Returns:
-        None
+        No arguments or returns.
         """
 
         # Use values of h5 file attributes to find where to start writing in h5 file
@@ -195,7 +179,8 @@ class RootConverter:
 
                     var_batch = self.params['syst_func'](cut_batch,
                                                          self.syst_map,
-                                                         self.params['s_constit_branches'])
+                                                         self.params['s_constit_branches'],
+                                                         **kwargs)
                     cut_batch.update(var_batch)
 
                 ################### Constituents ####################
@@ -210,12 +195,13 @@ class RootConverter:
                 # Find indeces of very small (or zero) pt constituents
                 small_pt_indeces = np.asarray(pt_zero < 100).nonzero()
 
-                # Here call preprocessing function, passed as a keyword
-                # argument. See docstring for details
-                batch_data.update(constit_func(cut_batch,
-                                               sort_indeces,
-                                               small_pt_indeces,
-                                               self.params))
+                # Here call preprocessing function, as set in params dict.
+                # See class docstring for details
+                cons_batch = self.params['constit_func'](cut_batch,
+                                                         sort_indeces,
+                                                         small_pt_indeces,
+                                                         self.params)
+                batch_data.update(cons_batch)
 
                 ####################### Jet ########################
 
@@ -384,6 +370,7 @@ if __name__ == '__main__':
         'target_dir': './dataloc/intermediates_test/',
         'n_targets': 1,
         'total': 22375114,
+        'constit_func': pp.raw_preprocess,
         'syst_func': syst.energy_scale,
         's_constit_branches': [
             'fjet_clus_pt', 'fjet_clus_eta',
@@ -417,4 +404,4 @@ if __name__ == '__main__':
     rc = RootConverter(convert_dict)
 
     # Run main program
-    rc.run(constit_func=pp.raw_preprocess)
+    rc.run(direction='up')
