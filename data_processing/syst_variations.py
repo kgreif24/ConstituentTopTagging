@@ -336,7 +336,7 @@ def energy_res(jets, uncert_map, constit_branches):
                 p = cons_en / cluster_scale.GetBinContent(Ebin, ebin)
 
             # Now get pT bins
-            pbin = cluster_means.GetXaxis().FindBin(cons_pt)
+            pbin = cluster_rms.GetXaxis().FindBin(p)
 
             # Correct overflow
             if (pbin > cluster_means.GetNbinsX()):
