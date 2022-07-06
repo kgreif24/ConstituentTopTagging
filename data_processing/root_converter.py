@@ -113,14 +113,11 @@ class RootConverter:
                 for br in self.params['jet_branches']:
                     file.create_dataset(br, hl_size, maxshape=hl_size, dtype='f4')
 
-                file.create_dataset(self.params['label_name'], hl_size, maxshape=hl_size, dtype='i4')
-
                 # Set file attributes
                 file.attrs.create('num_jets', 0, dtype='i4')
                 file.attrs.create('constit', self.params['t_constit_branches'])
                 file.attrs.create('hl', self.params['hl_branches'])
                 file.attrs.create('jet', self.params['jet_branches'])
-                file.attrs.create('label', self.params['label_name'])
                 file.attrs.create('max_constits', self.params['max_constits'])
 
             # Add built or opened file to list
@@ -209,6 +206,9 @@ class RootConverter:
 
                     branch = cut_batch[name]
                     batch_data[name] = ak.to_numpy(branch)
+
+                # Also find batch length here
+                batch_length = batch_data[pt_name].shape[0]
 
                 ##################### High Level ###################
 
@@ -312,8 +312,7 @@ class RootConverter:
                 targ_file[branch].resize(constits_size)
 
             hl_size_branches = (self.params['hl_branches']
-                                + self.params['jet_branches']
-                                + [self.params['label_name']])
+                                + self.params['jet_branches'])
             for branch in hl_size_branches:
                 targ_file[branch].resize(hl_size)
 
@@ -351,9 +350,9 @@ if __name__ == '__main__':
         'tree_name': ':FlatSubstructureJetTree',
         'rw_type': 'w',
         'max_constits': 200,
-        'target_dir': './dataloc/intermediates_taste/',
+        'target_dir': './dataloc/intermediates_test/',
         'n_targets': 1,
-        'total': 1000000,
+        'total': 10000,
         'constit_func': pp.raw_preprocess,
         'syst_func': None,
         's_constit_branches': [
@@ -374,7 +373,6 @@ if __name__ == '__main__':
             'fjet_clus_taste'
         ],
         'jet_branches': ['fjet_pt', 'fjet_eta', 'fjet_phi', 'fjet_m'],
-        'label_name': 'labels',
         'cut_branches': [
             'fjet_truthJet_eta', 'fjet_truthJet_pt', 'fjet_numConstituents', 'fjet_m',
             'fjet_truth_dRmatched_particle_flavor', 'fjet_truth_dRmatched_particle_dR',

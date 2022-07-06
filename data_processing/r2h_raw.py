@@ -4,43 +4,27 @@ data sets.
 
 Author: Kevin Greif
 python3
-Last updated 6/30/22
+Last updated 7/5/22
 """
 
 from root_converter import RootConverter
+import processing_utils as pu
 import preprocessing as pp
 
 # Define convert_dict which is passed to RootConverter class
-sig_dict = {
-    'svb_flag': True,
-    'trim': False,
-    'source_list': './dat/sig_test.list',
-    'rw_type': 'w',
-    'cut_branches': [
-        'fjet_truthJet_eta', 'fjet_truthJet_pt', 'fjet_numConstituents', 'fjet_m',
-        'fjet_truth_dRmatched_particle_flavor', 'fjet_truth_dRmatched_particle_dR',
-        'fjet_truthJet_dRmatched_particle_dR_top_W_matched', 'fjet_ungroomed_truthJet_m',
-        'fjet_truthJet_ungroomedParent_GhostBHadronsFinalCount', 'fjet_ungroomed_truthJet_Split23',
-        'fjet_ungroomed_truthJet_pt'
-    ]
-}
-
-bkg_dict = {
-    'svb_flag': False,
-    'trim': True,
-    'source_list': './dat/bkg_test.list',
-    'rw_type': 'a',
-    'cut_branches': [
-        'fjet_truthJet_eta', 'fjet_truthJet_pt', 'fjet_numConstituents', 'fjet_m'
-    ]
-}
-
-stem_dict = {
+convert_dict = {
     'tree_name': ':FlatSubstructureJetTree',
+    'trim': True,
+    'source_list': './dat/taste_test.list',
+    'rw_type': 'w',
     'max_constits': 200,
     'target_dir': './dataloc/intermediates_test/',
     'n_targets': 4,
-    'total': 22375114,
+    # 'total': 22375114,
+    'total': 40000,
+    'constit_func': pp.raw_preprocess,
+    'syst_func': None,
+    'cut_func': pu.signal_cuts,
     's_constit_branches': [
         'fjet_clus_pt', 'fjet_clus_eta',
         'fjet_clus_phi', 'fjet_clus_E'
@@ -57,16 +41,18 @@ stem_dict = {
         'fjet_clus_eta', 'fjet_clus_phi', 'fjet_clus_pt', 'fjet_clus_E'
     ],
     'jet_branches': ['fjet_pt', 'fjet_eta', 'fjet_phi', 'fjet_m'],
-    'label_name': 'labels',
+    'cut_branches': [
+        'fjet_truthJet_eta', 'fjet_truthJet_pt', 'fjet_numConstituents', 'fjet_m',
+        'fjet_truth_dRmatched_particle_flavor', 'fjet_truth_dRmatched_particle_dR',
+        'fjet_truthJet_dRmatched_particle_dR_top_W_matched', 'fjet_ungroomed_truthJet_m',
+        'fjet_truthJet_ungroomedParent_GhostBHadronsFinalCount', 'fjet_ungroomed_truthJet_Split23',
+        'fjet_ungroomed_truthJet_pt'
+    ]
 }
 
-sig_dict.update(stem_dict)
-bkg_dict.update(stem_dict)
-
-# Build the classes
-sig_rc = RootConverter(sig_dict)
-bkg_rc = RootConverter(bkg_dict)
+# Build the class
+rc = RootConverter(convert_dict)
 
 # Run main programs
-sig_rc.run(constit_func=pp.raw_preprocess)
-bkg_rc.run(constit_func=pp.raw_preprocess)
+rc.run()
+
