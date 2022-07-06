@@ -44,8 +44,8 @@ class RootConverter:
         # representative sample of each file for our train/test data sets.
         # Find number of jets we expect to pull from each file
         cb = self.params['cut_branches'] + self.params['hl_branches']
-        svb = self.params['svb_flag']
-        raw_file_events = [pu.find_cut_len(name, cb, svb) for name in self.files]
+        cf = self.params['cut_func']
+        raw_file_events = [pu.find_cut_len(name, cb, cf) for name in self.files]
         self.raw_file_events = np.array(raw_file_events)
         self.raw_events = np.sum(self.raw_file_events)
         print("We have", self.raw_events, "jets in total")
@@ -121,6 +121,7 @@ class RootConverter:
                 file.attrs.create('hl', self.params['hl_branches'])
                 file.attrs.create('jet', self.params['jet_branches'])
                 file.attrs.create('label', self.params['label_name'])
+                file.attrs.create('max_constits', self.params['max_constits'])
 
             # Add built or opened file to list
             self.h5files.append(file)
@@ -167,10 +168,7 @@ class RootConverter:
 
                 ##################### Make Cuts #####################
 
-                cuts = pu.common_cuts(jet_batch)
-                if self.params['svb_flag']:
-                    sc = pu.signal_cuts(jet_batch)
-                    cuts = np.logical_and(cuts, sc)
+                cuts = self.params['cut_func'](jet_batch)
                 cut_batch = {kw: jet_batch[kw][cuts,...] for kw in keep_branches}
 
                 #################### Apply Systs ####################
@@ -219,20 +217,6 @@ class RootConverter:
 
                     branch = cut_batch[name]
                     batch_data[name] = ak.to_numpy(branch)
-
-                ###################### Labels ######################
-
-                # If jet has made it through cuts in loop, it is
-                # either signal or background depending on source file,
-                # so just make vector of 1s or 0s.
-
-                # Find batch length
-                batch_length = batch_data[pt_name].shape[0]
-
-                if self.params['svb_flag']:
-                    batch_data['labels'] = np.ones(batch_length, dtype='i4')
-                else:
-                    batch_data['labels'] = np.zeros(batch_length, dtype='i4')
 
                 ##################### Write ########################
 
@@ -361,7 +345,7 @@ if __name__ == '__main__':
     # Define convert_dict which is passed to RootConverter class
     # This particular dict is set up to do raw conversion (no preprocessing)
     convert_dict = {
-        'svb_flag': True,
+        'cut_func': pu.signal_cuts,
         'trim': True,
         'source_list': './dat/Zprime_taste.list',
         'tree_name': ':FlatSubstructureJetTree',

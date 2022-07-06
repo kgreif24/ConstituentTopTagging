@@ -27,16 +27,16 @@ def find_raw_len(filename):
 
     events = uproot.open(filename)
     return ak.num(events['fjet_pt'], axis=0)
-    
 
-def find_cut_len(filename, cut_branches, svb):
+
+def find_cut_len(filename, cut_branches, cut_func):
     """ find_cut_len - Take in a path to a .root file and returns the number of
     events in that file that will pass a set of cuts.
 
     Arguments:
     filename (string) - The path to the file (including tree name)
     cuts (list) - List of branches needed to calculate cuts
-    svb (bool) - Flag for running signal or background cuts
+    cut_func (func) - The function which computes our desired cuts
 
     Returns
     (int) - The number of events in file that will pass cuts
@@ -46,11 +46,8 @@ def find_cut_len(filename, cut_branches, svb):
     events = uproot.open(filename)
     arrays = events.arrays(filter_name=cut_branches)
 
-    # Call appropriate cut functions on the loaded arrays
-    cuts = common_cuts(arrays)
-    if svb == True:
-        sc = signal_cuts(arrays)
-        cuts = np.logical_and(cuts, sc)
+    # Call cut function on the loaded arrays
+    cuts = cut_func(arrays)
 
     return np.count_nonzero(cuts)
 
@@ -421,8 +418,8 @@ def common_cuts(batch):
 
 
 def signal_cuts(batch):
-    """ signal_cuts - Identical to the above common cuts, but applies the rel 22.0
-    signal cuts.
+    """ signal_cuts - Call the above function to produce the common cuts, but
+    also adds a set of signal cuts which should be applied to the Z' sample.
 
     Arguments:
     batch (obj or dict) - The batch data from which to compute cuts
@@ -433,6 +430,7 @@ def signal_cuts(batch):
 
     # Assemble boolean arrays
     cuts = []
+    cuts.append(common_cuts(batch))
     cuts.append(abs(batch['fjet_truth_dRmatched_particle_flavor']) == 6)
     cuts.append(abs(batch['fjet_truth_dRmatched_particle_dR']) < 0.75)
     cuts.append(abs(batch['fjet_truthJet_dRmatched_particle_dR_top_W_matched']) < 0.75)
