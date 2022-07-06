@@ -1,10 +1,10 @@
-""" make_set.py - This program will shuffle a set of h5 files (keeping
-each dataset in relative order), standardize HL inputs, and calculate all training
-weights. It will then combine h5 files into one single h5 file that can be
-directly passed to a training routine.
+""" make_set.py - This program will generate an .h5 file ready for training,
+starting from two sets of intermediates files, one of which will serve as
+signal and the other background. It can also calculate training weights,
+and perform simple standardizations.
 
 Author: Kevin Greif
-Last updated 3/5/22
+Last updated 7/5/22
 python3
 """
 
@@ -89,5 +89,3 @@ pu.calc_weights(f_train, pu.match_weights)
 pu.calc_weights(f_test, pu.match_weights)
 
 print("Finished buildling train/test files")
-
-
