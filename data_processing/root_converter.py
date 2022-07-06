@@ -363,15 +363,15 @@ if __name__ == '__main__':
     convert_dict = {
         'svb_flag': True,
         'trim': True,
-        'source_list': './dat/taste_test.list',
+        'source_list': './dat/Zprime_taste.list',
         'tree_name': ':FlatSubstructureJetTree',
         'rw_type': 'w',
         'max_constits': 200,
-        'target_dir': './dataloc/intermediates_test/',
+        'target_dir': './dataloc/intermediates_taste/',
         'n_targets': 1,
-        'total': 22375114,
+        'total': 1000000,
         'constit_func': pp.raw_preprocess,
-        'syst_func': syst.energy_res,
+        'syst_func': None,
         's_constit_branches': [
             'fjet_clus_pt', 'fjet_clus_eta',
             'fjet_clus_phi', 'fjet_clus_E',
@@ -404,4 +404,4 @@ if __name__ == '__main__':
     rc = RootConverter(convert_dict)
 
     # Run main program
-    rc.run(direction='up')
+    rc.run()
