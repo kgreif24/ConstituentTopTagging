@@ -10,24 +10,26 @@ Last updated 7/5/22
 from root_converter import RootConverter
 import processing_utils as pu
 import preprocessing as pp
+import syst_variations as syst
 
 # Define convert_dict which is passed to RootConverter class
 convert_dict = {
     'tree_name': ':FlatSubstructureJetTree',
     'trim': True,
-    'source_list': './dat/taste_test.list',
+    'source_list': './dat/Zprime_taste.list',
     'rw_type': 'w',
     'max_constits': 200,
-    'target_dir': './dataloc/intermediates_test/',
-    'n_targets': 4,
+    'target_dir': './dataloc/int_nominal/',
+    'n_targets': 8,
     # 'total': 22375114,
-    'total': 40000,
+    'total': 4000000,
     'constit_func': pp.raw_preprocess,
-    'syst_func': None,
+    'syst_func': syst.energy_scale,
     'cut_func': pu.signal_cuts,
     's_constit_branches': [
         'fjet_clus_pt', 'fjet_clus_eta',
-        'fjet_clus_phi', 'fjet_clus_E'
+        'fjet_clus_phi', 'fjet_clus_E',
+        'fjet_clus_taste'
     ],
     'pt_name': 'fjet_clus_pt',
     'hl_branches': [
@@ -38,7 +40,8 @@ convert_dict = {
         'fjet_ThrustMaj'
     ],
     't_constit_branches': [
-        'fjet_clus_eta', 'fjet_clus_phi', 'fjet_clus_pt', 'fjet_clus_E'
+        'fjet_clus_eta', 'fjet_clus_phi', 'fjet_clus_pt', 'fjet_clus_E',
+        'fjet_clus_taste'
     ],
     'jet_branches': ['fjet_pt', 'fjet_eta', 'fjet_phi', 'fjet_m'],
     'cut_branches': [
@@ -54,5 +57,5 @@ convert_dict = {
 rc = RootConverter(convert_dict)
 
 # Run main programs
-rc.run()
+rc.run(direction='up')
 

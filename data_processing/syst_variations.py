@@ -14,8 +14,11 @@ Last updated 7/5/22
 python3
 """
 
+import sys
+
 import awkward as ak
 import numpy as np
+from tqdm import tqdm
 
 def reco_efficiency(jets, uncert_map, constit_branches):
     """ reco_efficiency - This function applies the cluster reconstruction
@@ -167,33 +170,45 @@ def energy_scale(jets, uncert_map, constit_branches, direction='up'):
     # build the new pT and energy values for the constituents
     n_jets = len(en)
     n_constits = ak.count(en, axis=1)
+    total_constits = ak.sum(n_constits)
 
-    # Initialize 2 akward array builders for the varied pT and energy arrays
+    ## Initialize 2 akward array builders for the varied pT and energy arrays
     p_builder = ak.ArrayBuilder()
     E_builder = ak.ArrayBuilder()
 
-    # Jet loop
-    for i in range(n_jets):
+    # Immediately begin list in array builders
+    p_builder.begin_list()
+    E_builder.begin_list()
 
-        # Add list to builders
-        p_builder.begin_list()
-        E_builder.begin_list()
+    # Loop over flattened array, putting list breaks in awkward array based
+    # on information in n_constits vector
+    en = ak.flatten(en)
+    eta = ak.flatten(abs(jets['fjet_clus_eta']))
+    pt = ak.flatten(jets['fjet_clus_pt'])
+    taste = ak.flatten(jets['fjet_clus_pt'])
+    iterable = zip(en, eta, pt, taste)
 
-        # Constituent loop
-        for j in range(n_constits[i]):
+    # Counters to manage list breaks
+    jet_counter = 0
+    constit_counter = 0
 
-            # Get constituent energy, eta, pT, and taste
-            cons_en = en[i,j]
-            cons_eta = abs(jets['fjet_clus_eta'][i,j])
-            cons_pt = jets['fjet_clus_pt'][i,j]
-            cons_taste = jets['fjet_clus_taste'][i,j]
+    # Constituent loop
+    for cons_en, cons_eta, cons_pt, cons_taste in iterable:
 
-            # If constituent is not neutral (taste == 1), write nominal values
-            # and skip to next
-            if cons_taste != 1:
-                p_builder.append(cons_pt)
-                E_builder.append(cons_en)
-                continue
+        ## Start by finding number of constits in a jet, only if this is
+        # the first constituent
+        if constit_counter == 0:
+            jet_constits = n_constits[jet_counter]
+
+        ## If constituent is not neutral (taste == 1), write nominal values
+        if cons_taste != 1 or True:
+
+            # Write nominal
+            p_builder.append(cons_pt)
+            E_builder.append(cons_en)
+
+        # Else, we apply systematic variation
+        else:
 
             # Get energy and eta bins
             Ebin = cluster_scale.GetXaxis().FindBin(cons_en)
@@ -237,19 +252,33 @@ def energy_scale(jets, uncert_map, constit_branches, direction='up'):
 
             # Calculate new energy
             Eces = ptces * np.cosh(cons_eta)
-            print("\nOld pT: {0:.4f}\tOld en: {1:.4f}".format(cons_pt, cons_en))
-            print("New pT: {0:0.4f}\tNew en: {1:.4f}".format(ptces, Eces))
+            # print("\nOld pT: {0:.4f}\tOld en: {1:.4f}".format(cons_pt, cons_en))
+            # print("New pT: {0:0.4f}\tNew en: {1:.4f}".format(ptces, Eces))
 
             # Add new values to array builders
             p_builder.append(ptces)
             E_builder.append(Eces)
 
-        # End constituent loop
-        # Close builder lists
-        p_builder.end_list()
-        E_builder.end_list()
+        ## Increment consituent counter
+        constit_counter += 1
 
-    # End jet loop
+        ## If this is the last constituent in the jet, add array break
+        if constit_counter == jet_constits:
+
+            # Add array break
+            p_builder.end_list()
+            E_builder.end_list()
+            p_builder.begin_list()
+            E_builder.begin_list()
+
+            # Reset constituent counter
+            constit_counter = 0
+
+            # Increment jet counter
+            jet_counter += 1
+            
+    # End constituent loop
+
     # Take snapshots of builders
     var_pt = p_builder.snapshot()
     var_en = E_builder.snapshot()
