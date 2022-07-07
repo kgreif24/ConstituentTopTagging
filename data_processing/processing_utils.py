@@ -467,3 +467,25 @@ def count_sig(raw_batch, sig=False):
 
     # Return the number of trues in boolean array
     return np.count_nonzero(cuts)
+
+
+def calc_jets(jets):
+    """ calc_jets - This function will calculate jet level quantities, namely
+    the energy, pT, and mass from the constituent 4 vectors contained in a
+    jet batch. Used to recalculate jet level quantities after systematic
+    variations have been applied to the constituents.
+
+    Arguments:
+    jets (dict): The jet batch, at a minimum must have constituent pT, eta,
+    phi, energy information
+
+    Returns:
+    (dict): A dictionary containing vectors of the calculated quantities
+    """
+
+    # First find px, py, pz from pT, phi, and eta
+    px = jets['fjet_clus_pt'] * np.cos(jets['fjet_clus_phi'])
+    py = jets['fjet_clus_pt'] * np.sin(jets['fjet_clus_phi'])
+    pz = jets['fjet_clus_pt'] * np.sinh(jets['fjet_clus_eta'])
+
+    # More thought must be placed here...

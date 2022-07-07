@@ -198,28 +198,37 @@ class SetBuilder:
                 bkg = h5py.File(bkg_name, 'r')
 
                 # Find number of jets in sum of signal and background
-                num_file_jets = sig.attrs.get("num_jets") + bkg.attrs.get("num_jets")
+                num_sig_jets = sig.attrs.get("num_jets")
+                num_bkg_jets = bkg.attrs.get("num_jets")
+                num_file_jets = num_sig_jets + num_bkg_jets
                 stop_index = start_index + num_file_jets
 
                 # Extract dataset names from attributes
                 constit_branches = sig.attrs.get('constit')
                 hl_branches = sig.attrs.get('hl')
                 jet_branches = sig.attrs.get('pt')
-                label_branch = sig.attrs.get('label')
-                unstacked = (constit_branches + hl_branches + jet_branches
-                             + label_branch)
+                unstacked = (constit_branches + hl_branches + jet_branches)
 
                 # Get random seed for our shuffles
                 rng_seed = np.random.default_rng()
                 rseed = rng_seed.integers(1000)
 
-                # concatenate, Shuffle, and Write each branch
+                # Concatenate, Shuffle, and Write each branch
                 for var in unstacked:
                     sig_var = sig[var][...]
                     bkg_var = bkg[var][...]
                     this_var = np.concatenate((sig_var, bkg_var), axis=0)
                     self.branch_shuffle(this_var, seed=rseed)
                     target[var][start_index:stop_index,...] = this_var
+
+                # Build labels branch
+                sig_labels = np.ones(num_sig_jets)
+                bkg_labels = np.zeros(num_bkg_jets)
+                labels = np.concatenate((sig_labels, bkg_labels))
+
+                # Shuffle and write labels branch
+                self.branch_shuffle(labels, seed=rseed)
+                target['labels'][start_index:stop_index] = labels
 
                 # Increment counters and close files
                 start_index = stop_index
@@ -232,6 +241,66 @@ class SetBuilder:
         # Finish by printing summary of how many jets were written to file
         print("We wrote", stop_index, "jets to target file")
         target.attrs.modify("num_jets", stop_index)
+
+
+    def solo_process(self):
+        """ solo_process - Identical to the process function, except for use
+        when we are only processing one sample (i.e. the set is not for training
+        but only for plotting and inference purposes). No labels will be added
+        to the set in this function.
+
+        Here we always assume target file is self.train
+
+        No arguments or returns
+        """
+
+        # This function should only be called when not running background
+        assert not self.run_bkg
+
+        # Only one element of schedule
+        dict = self.schedule[0]
+
+        # Counter to keep track of writing in target file
+        start_index = 0
+
+        # Loop through file list
+        print("Writing to output file")
+        for i, name in enumerate(dict['sig']):
+            print("Now processing file:{}".format(name))
+
+            # Open file
+            file = h5py.File(name, 'r')
+
+            # Find number of jets
+            num_jets = file.attrs.get('num_jets')
+            end_index = start_index + num_jets
+
+            # Extract dataset names from attributes
+            constit_branches = file.attrs.get('constit')
+            hl_branches = file.attrs.get('hl')
+            jet_branches = file.attrs.get('pt')
+            unstacked = (constit_branches + hl_branches + jet_branches)
+
+            # Get random seed for our shuffles
+            rng_seed = np.random.default_rng()
+            rseed = rng_seed.integers(1000)
+
+            # Shuffle, and write each branch
+            for var in unstacked:
+                this_var = file[var][...]
+                self.branch_shuffle(this_var, seed=rseed)
+                self.train[var][start_index:stop_index,...] = this_var
+
+            # Increment counters and close file
+            start_index = stop_index
+            file.close()
+
+        # End file loop
+
+        # Finish by printing summary of how many jets were written to file
+        print("We wrote", stop_index, "jets to target file")
+        self.train.attrs.modify("num_jets", stop_index)
+
 
 
     def branch_shuffle(branch, seed=42):
@@ -261,14 +330,27 @@ class SetBuilder:
         """
 
         self.build_files()
-        self.process()
+
+        # Run appropriate process function depending on if we are running
+        # background
+        if self.run_bkg:
+            self.process()
+        else:
+            self.solo_process()
+
+        # Close target files
+        self.train.close()
+        if self.params['test_name'] != None:
+            self.test.close()
+
 
 
 if __name__ == '__main__':
 
     build_dict = {
-        'signal': './dataloc/intermediates_taste'
+        'signal': './dataloc/int_nominal'
         'background': None,
         'test_name': None,
+        'train_name': './dataloc/nominal.h5'
         'test_frac': 0
     }
