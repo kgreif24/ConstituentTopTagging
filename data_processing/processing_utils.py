@@ -54,16 +54,16 @@ def find_cut_len(filename, cut_branches, cut_func):
 
 def find_h5_len(filename):
     """ find_h5_len - Take in a path to a .h5 file and returns the length of
-    the labels dataset.
+    the fjet_pt data set.
 
     Arguments:
     filename (string) - The path to the file
 
     Returns
-    (int) - The length of the labels dataset
+    (int) - The length of the fjet_pt dataset
     """
     f = h5py.File(filename, 'r')
-    return f['labels'].shape[0]
+    return f['fjet_pt'].shape[0]
 
 
 def flat_weights(pt, n_bins=200, **kwargs):

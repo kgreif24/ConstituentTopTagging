@@ -64,6 +64,9 @@ class SetBuilder:
         # Perform train / test split if desired, build schedule
         if setup_dict['test_name'] != None:
 
+            print("Running signal and background w/ split")
+            assert self.run_bkg
+
             # Calculate split
             frac = setup_dict['test_frac']
             split = np.around(frac * len(sig_list))
@@ -80,9 +83,13 @@ class SetBuilder:
 
         elif self.run_bkg:
 
+            print("Running signal and background")
+
             self.schedule.append({'sig': sig_list, 'bkg': bkg_list, 'test': False})
 
         else:
+
+            print("Running signal without labels")
 
             self.schedule.append({'sig': sig_list, 'bkg': [], 'test': False})
 
@@ -94,7 +101,7 @@ class SetBuilder:
             bkg_length = sum([pu.find_h5_len(name) for name in d['bkg']])
             if d['test']:
                 self.n_test += sig_length + bkg_length
-            elif:
+            else:
                 self.n_train += sig_length + bkg_length
 
 
@@ -105,6 +112,8 @@ class SetBuilder:
 
         No argument and returns
         """
+
+        print("Building output files")
 
         # Initialize output list
         out_list = []
@@ -119,10 +128,10 @@ class SetBuilder:
             out_list.append(self.test)
 
         # Open reference file
-        ref = h5py.File(self.schedule[0]['list'][0], 'r')
+        ref = h5py.File(self.schedule[0]['sig'][0], 'r')
         constit_branches = ref.attrs.get('constit')
         hl_branches = ref.attrs.get('hl')
-        jet_branches = ref.attrs.get('pt')
+        jet_branches = ref.attrs.get('jet')
         max_constits = ref.attrs.get('max_constits')
 
         # Loop through process list
@@ -140,7 +149,7 @@ class SetBuilder:
                 file.create_dataset(var, constit_shape, dtype='f4')
 
             # HL variables
-            hl_shape = (num_jets,)
+            hl_shape = (n_jets,)
             for var in hl_branches:
                 file.create_dataset(var, hl_shape, dtype='f4')
 
@@ -149,7 +158,8 @@ class SetBuilder:
                 file.create_dataset(var, hl_shape, dtype='f4')
 
             # Labels
-            file.create_dataset('labels', hl_shape, dtype='i4')
+            if self.run_bkg:
+                file.create_dataset('labels', hl_shape, dtype='i4')
 
             # Attributes
             file.attrs.create("num_jets", n_jets)
@@ -273,13 +283,13 @@ class SetBuilder:
 
             # Find number of jets
             num_jets = file.attrs.get('num_jets')
-            end_index = start_index + num_jets
+            stop_index = start_index + num_jets
 
             # Extract dataset names from attributes
             constit_branches = file.attrs.get('constit')
             hl_branches = file.attrs.get('hl')
-            jet_branches = file.attrs.get('pt')
-            unstacked = (constit_branches + hl_branches + jet_branches)
+            jet_branches = file.attrs.get('jet')
+            unstacked = np.concatenate((constit_branches, hl_branches, jet_branches))
 
             # Get random seed for our shuffles
             rng_seed = np.random.default_rng()
@@ -303,7 +313,7 @@ class SetBuilder:
 
 
 
-    def branch_shuffle(branch, seed=42):
+    def branch_shuffle(self, branch, seed=42):
         """ branch_shuffle - This shuffle takes in a dataset represented by a numpy array,
         as well as a seed for a random generator. It will then shuffle the branch using numpys
         random shuffle routine.
@@ -348,9 +358,12 @@ class SetBuilder:
 if __name__ == '__main__':
 
     build_dict = {
-        'signal': './dataloc/int_nominal'
+        'signal': './dataloc/int_nominal/',
         'background': None,
         'test_name': None,
-        'train_name': './dataloc/nominal.h5'
+        'train_name': './dataloc/nominal.h5',
         'test_frac': 0
     }
+
+    sb = SetBuilder(build_dict)
+    sb.run()
