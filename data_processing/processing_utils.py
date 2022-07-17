@@ -391,7 +391,7 @@ def common_cuts(batch):
     cuts = []
     cuts.append(abs(batch['fjet_truthJet_eta']) < 2.0)
     cuts.append(batch['fjet_truthJet_pt'] / 1000. > 350.)
-    cuts.append(batch['fjet_numConstituents'] > 3)
+    cuts.append(batch['fjet_numConstituents'] >= 3)
     cuts.append(batch['fjet_m'] / 1000. > 40.)
 
     # Going to also include cuts on hl var exit codes here
@@ -418,7 +418,7 @@ def common_cuts(batch):
 
 
 def signal_cuts(batch):
-    """ signal_cuts - Call the above function to produce the common cuts, but
+    """ signal_cuts - Calls the above function to produce the common cuts, but
     also adds a set of signal cuts which should be applied to the Z' sample.
 
     Arguments:
@@ -437,6 +437,34 @@ def signal_cuts(batch):
     cuts.append(batch['fjet_ungroomed_truthJet_m'] / 1000. > 140.)
     cuts.append(batch['fjet_truthJet_ungroomedParent_GhostBHadronsFinalCount'] >= 1)
     cuts.append(batch['fjet_ungroomed_truthJet_Split23'] / 1000. > np.exp(3.3-6.98e-4*batch['fjet_ungroomed_truthJet_pt']/1000.))
+
+    # Take and of all cuts
+    total_cuts = np.logical_and.reduce(cuts)
+
+    return total_cuts
+
+
+def trans_cuts(batch):
+    """ trans_cuts - Implements the cuts we will use for both signal and
+    background for the Delphes data used in the transfer learning
+    project.
+
+    Arugments:
+    batch (obj or dict) - The batch of jets for which to compute cuts
+
+    Returns:
+    (array) - Boolean array representing total cuts
+    """
+
+    # Assemble boolean arrays
+    cuts = []
+    cuts.append(abs(batch['fjet_eta']) < 2.0)
+    cuts.append(batch['fjet_pt'] > 350)
+    cuts.append(batch['fjet_numConstits'] >= 3)
+    cuts.append(batch['fjet_m'] > 40)
+
+    for it in cuts:
+        print(it[:10])
 
     # Take and of all cuts
     total_cuts = np.logical_and.reduce(cuts)
