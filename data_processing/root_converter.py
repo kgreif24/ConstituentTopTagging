@@ -174,7 +174,6 @@ class RootConverter:
 
                     var_batch = self.params['syst_func'](cut_batch,
                                                          self.syst_map,
-                                                         self.params['s_constit_branches'],
                                                          **kwargs)
                     cut_batch.update(var_batch)
 
