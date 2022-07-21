@@ -216,8 +216,8 @@ class SetBuilder:
                 # Extract dataset names from attributes
                 constit_branches = sig.attrs.get('constit')
                 hl_branches = sig.attrs.get('hl')
-                jet_branches = sig.attrs.get('pt')
-                unstacked = (constit_branches + hl_branches + jet_branches)
+                jet_branches = sig.attrs.get('jet')
+                unstacked = np.concatenate((constit_branches, hl_branches, jet_branches))
 
                 # Get random seed for our shuffles
                 rng_seed = np.random.default_rng()
@@ -358,10 +358,10 @@ class SetBuilder:
 if __name__ == '__main__':
 
     build_dict = {
-        'signal': './dataloc/int_nominal/',
-        'background': None,
+        'signal': './dataloc/transferLearning/int_zprime/',
+        'background': './dataloc/transferLearning/int_dijet/',
         'test_name': None,
-        'train_name': './dataloc/nominal.h5',
+        'train_name': './dataloc/transferLearning/delphes_zprime_dijet.h5',
         'test_frac': 0
     }
 
