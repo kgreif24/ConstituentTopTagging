@@ -463,9 +463,6 @@ def trans_cuts(batch):
     cuts.append(batch['fjet_numConstits'] >= 3)
     cuts.append(batch['fjet_m'] > 40)
 
-    for it in cuts:
-        print(it[:10])
-
     # Take and of all cuts
     total_cuts = np.logical_and.reduce(cuts)
 
