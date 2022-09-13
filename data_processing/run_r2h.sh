@@ -18,5 +18,4 @@
 #SBATCH --mail-user=kgreif@uci.edu
 #SBATCH --mail-type=ALL
 
-python root2hd5.py --signal
-python root2hd5.py --background
+python r2h_trans.py

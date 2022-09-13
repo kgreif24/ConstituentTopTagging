@@ -459,7 +459,7 @@ def trans_cuts(batch):
     # Assemble boolean arrays
     cuts = []
     cuts.append(abs(batch['fjet_eta']) < 2.0)
-    cuts.append(batch['fjet_pt'] > 350)
+    cuts.append(batch['fjet_pt'] > 350000)
     cuts.append(batch['fjet_numConstits'] >= 3)
     cuts.append(batch['fjet_m'] > 40)
 

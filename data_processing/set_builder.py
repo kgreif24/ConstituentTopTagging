@@ -69,7 +69,7 @@ class SetBuilder:
 
             # Calculate split
             frac = setup_dict['test_frac']
-            split = np.around(frac * len(sig_list))
+            split = int(np.around(frac * len(sig_list)))
 
             # Perform splits
             sig_test = sig_list[:split]
@@ -103,6 +103,10 @@ class SetBuilder:
                 self.n_test += sig_length + bkg_length
             else:
                 self.n_train += sig_length + bkg_length
+
+        print("Generating files with the following numbers of jets:")
+        print("Training set:", self.n_train)
+        print("Testing set:", self.n_test)
 
 
     def build_files(self):
@@ -191,12 +195,12 @@ class SetBuilder:
             start_index = 0
 
             # Set target based on if we are running training or testing
-            if i == 0:
-                print("Writing to training set")
-                target = self.train
-            elif i == 1:
+            if d['test']:
                 print("Writing to testing set")
                 target = self.test
+            else:
+                print("Writing to training set")
+                target = self.train
 
             # Loop through file lists
             iterable = zip(d['sig'], d['bkg'])
