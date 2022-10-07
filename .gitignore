@@ -10,3 +10,10 @@ plt
 tmp
 venv
 .git
+
+Root2HDF5/make_set?.py
+Root2HDF5/r2h_syst?.py
+Root2HDF5/run_ms?.sh
+Root2HDF5/run_r2h?.sh
+Root2HDF5/dataloc
+Root2HDF5/dat/*

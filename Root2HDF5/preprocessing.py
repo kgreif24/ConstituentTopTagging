@@ -23,8 +23,9 @@ def raw_preprocess(jets, sort_indeces, zero_indeces, params):
     # Initialize preprocess dict
     preprocess = {}
 
-    # Loop through target constituents
-    for name in params['t_constit_branches']:
+    # Loop through target constituents and onehots
+    loop_branches = params['t_constit_branches'] + params['t_onehot_branches']
+    for name in loop_branches:
 
         # Get branch
         branch = jets[name]
@@ -102,7 +103,7 @@ def energy_norm(jets, indeces, max_constits=200, **kwargs):
     return pt_sort, en_sort
 
 
-def log_norm(jets, name, indeces, max_constits=200, **kwargs):
+def log_norm(jets, name, sort_indeces, zero_indeces, max_constits=200, **kwargs):
     """ log_norm - As opposed to energy norm, this preprocessing function will
     return the logs of the normalized, and un-normalized pT or E. It is meant
     to recreate the preprocessing used in the Particle Net paper.
@@ -112,8 +113,10 @@ def log_norm(jets, name, indeces, max_constits=200, **kwargs):
     pt and energy. Usually a batch of a loop over a .root file using uproot.
     name (str): Either 'fjet_clus_pt', or 'fjet_clus_E'. Function will apply preprocessing
     to this element of the jets dict.
-    indeces (array): The indeces which will sort the constituents by INCREASING pt. Sort
+    sort_indeces (array): The indeces which will sort the constituents by INCREASING pt. Sort
     will be reflected to sort by decreasing pt.
+    zero_indeces (array): The indeces of constituents which do not pass
+    minimum pT cut. These are masked to zero.
     max_constits (int): The number of constituents to keep in our jets. Jets shorter
     than this will be zero padded, jets longer than this will be truncated.
 
@@ -137,16 +140,20 @@ def log_norm(jets, name, indeces, max_constits=200, **kwargs):
     lognorm_cons_zero = ak.pad_none(lognorm_cons, max_constits, axis=1, clip=True)
     lognorm_cons_zero = ak.to_numpy(ak.fill_none(lognorm_cons_zero, 0, axis=None))
 
+    # Mask small pT constituents
+    log_cons_zero[zero_indeces] = 0
+    lognorm_cons_zero[zero_indeces] = 0
+
     # Sort jets by decreasing pt
     # Odd slicing is needed to invert pt ordering (decreasing vs increasing)
-    log_cons_sort = np.take_along_axis(log_cons_zero, indeces, axis=1)[:,::-1]
-    lognorm_cons_sort = np.take_along_axis(lognorm_cons_zero, indeces, axis=1)[:,::-1]
+    log_cons_sort = np.take_along_axis(log_cons_zero, sort_indeces, axis=1)[:,::-1]
+    lognorm_cons_sort = np.take_along_axis(lognorm_cons_zero, sort_indeces, axis=1)[:,::-1]
 
     # Return results
     return log_cons_sort, lognorm_cons_sort
 
 
-def simple_angular(jets, indeces, max_constits=200, **kwargs):
+def simple_angular(jets, sort_indeces, zero_indeces, max_constits=200, **kwargs):
     """ simple_angular - This function will perform a simple preprocessing
     on the angular constituent information. It is the same preprocessing used
     in 1902.09914.
@@ -154,8 +161,10 @@ def simple_angular(jets, indeces, max_constits=200, **kwargs):
     Arguments:
     jets (dict): Dictionary whose elements are awkard arrays giving the constituent
     eta and phi. Usually a batch of a loop over a .root file using uproot.
-    indeces (array): The indeces which will sort the constituents by INCREASING pt. Sort
+    sort_indeces (array): The indeces which will sort the constituents by INCREASING pt. Sort
     will be reflected to sort by decreasing pt.
+    zero_indeces (array): The indeces of constituents which do not pass
+    minimum pT cut. These are masked to zero.
     max_constits (int): The number of constituents to keep in our jets. Jets shorter
     than this will be zero padded, jets longer than this will be truncated.
 
@@ -173,8 +182,8 @@ def simple_angular(jets, indeces, max_constits=200, **kwargs):
     # Find the eta/phi coordinates of hardest constituent in each jet, going to
     # need some fancy indexing
     ax_index = np.arange(0, len(eta), 1)
-    first_eta = eta[ax_index, indeces[:,-1]]
-    first_phi = phi[ax_index, indeces[:,-1]]
+    first_eta = eta[ax_index, sort_indeces[:,-1]]
+    first_phi = phi[ax_index, sort_indeces[:,-1]]
 
     # Now center
     eta_center = eta - first_eta[:,np.newaxis]
@@ -186,14 +195,14 @@ def simple_angular(jets, indeces, max_constits=200, **kwargs):
 
     # 2. Rotate such that 2nd hardest constituent sits on negative phi axis
     # Screen indeces for any jets with 1 or 2 constituents (ask about these)
-    second_eta = eta_center[ax_index, indeces[:,-2]]
-    second_phi = phi_center[ax_index, indeces[:,-2]]
+    second_eta = eta_center[ax_index, sort_indeces[:,-2]]
+    second_phi = phi_center[ax_index, sort_indeces[:,-2]]
     angle = np.arctan2(second_phi, second_eta) + np.pi/2
     eta_rot = eta_center * np.cos(angle[:,np.newaxis]) + phi_center * np.sin(angle[:,np.newaxis])
     phi_rot = -eta_center * np.sin(angle[:,np.newaxis]) + phi_center * np.cos(angle[:,np.newaxis])
 
     # 3. If needed, reflect 3rd hardest constituent into positive eta half-plane
-    third_eta = eta_rot[ax_index, indeces[:,-3]]
+    third_eta = eta_rot[ax_index, sort_indeces[:,-3]]
     parity = np.where(third_eta < 0, -1, 1)
     eta_flip = eta_rot * parity[:,np.newaxis]
 
@@ -203,14 +212,62 @@ def simple_angular(jets, indeces, max_constits=200, **kwargs):
     phi_zero = ak.pad_none(phi_rot, max_constits, axis=1, clip=True)
     phi_zero = ak.to_numpy(ak.fill_none(phi_zero, 0, axis=None))
 
-    # Sort constituents using indeces passed into function
-    eta_sort = np.take_along_axis(eta_zero, indeces, axis=1)[:,::-1]
-    phi_sort = np.take_along_axis(phi_zero, indeces, axis=1)[:,::-1]
+    # Mask small pT indeces
+    eta_zero[zero_indeces] = 0
+    phi_zero[zero_indeces] = 0
 
+    # Sort constituents using indeces passed into function
+    eta_sort = np.take_along_axis(eta_zero, sort_indeces, axis=1)[:,::-1]
+    phi_sort = np.take_along_axis(phi_zero, sort_indeces, axis=1)[:,::-1]
 
     # Finished preprocessing. Return results
     return eta_sort, phi_sort
 
+
+def train_preprocess(jets, sort_indeces, zero_indeces, params):
+    """ train_preprocess - This function applies the standard preprocessing
+    used for training networks. It applies the "lognorm" preprocessing for
+    dimensionful (energ and pT) inputs and the "simple_angular" preprocessing
+    for coordinate (eta and phi) inputs. It also calculates \DeltaR from
+    the preprocessed angular inputs.
+
+    Arguments and returns are standard
+    """
+
+    # Apply lognorm preprocessing for pT and energy branches
+    log_pt, lognorm_pt = log_norm(
+        jets,
+        'fjet_clus_pt',
+        sort_indeces,
+        zero_indeces,
+        max_constits=params['max_constits']
+    )
+    log_en, lognorm_en = log_norm(
+        jets,
+        'fjet_clus_E',
+        sort_indeces,
+        zero_indeces,
+        max_constits=params['max_constits']
+    )
+
+    # Apply simple angular processing for eta and phi branches
+    eta, phi = simple_angular(
+        jets,
+        sort_indeces,
+        zero_indeces,
+        max_constits=params['max_constits']
+    )
+
+    # Calculate \DeltaR with the preprocessed constituents
+    dR = np.sqrt(eta**2 + phi**2)
+
+    # Return preprocessed branches
+    pp_dict = {
+        'fjet_clus_eta': eta, 'fjet_clus_phi': phi, 'fjet_clus_log_pt': log_pt,
+        'fjet_clus_log_E': log_en, 'fjet_clus_lognorm_pt': lognorm_pt,
+        'fjet_clus_lognorm_E': lognorm_en, 'fjet_clus_dR': dR
+    }
+    return pp_dict
 
 
 # Some code to test preprocessing
