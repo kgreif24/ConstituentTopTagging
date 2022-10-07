@@ -11,6 +11,13 @@ tmp
 venv
 .git
 
+dataloc
+repo
+training/*
+outfiles/*
+plots/*
+checkpoints/*
+
 Root2HDF5/make_set?.py
 Root2HDF5/r2h_syst?.py
 Root2HDF5/run_ms?.sh
