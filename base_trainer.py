@@ -61,6 +61,7 @@ class BaseTrainer:
             batch_size=self.batchSize,
             net_type=setup['type'],
             max_constits=setup['maxConstits'],
+            max_jets=setup['maxJets'],
             num_folds=setup['numFolds'],
             this_fold=fold,
             mode='train'
@@ -71,6 +72,7 @@ class BaseTrainer:
             batch_size=self.batchSize,
             net_type=setup['type'],
             max_constits=setup['maxConstits'],
+            max_jets=setup['maxJets'],
             num_folds=setup['numFolds'],
             this_fold=fold,
             mode='valid'
@@ -102,7 +104,7 @@ class BaseTrainer:
             batch_size=self.batchSize,
             validation_data=self.dvalid,
             callbacks=callbacks,
-            verbose=2
+            verbose=1
         )
 
         # Return train history
@@ -119,4 +121,4 @@ class BaseTrainer:
         (array) - The array of predictions over the validation set
         """
 
-        return self.model.predict(self.dvalid, self.batchSize, verbose=0)
+        return self.model.predict(self.dvalid, self.batchSize, verbose=1)
