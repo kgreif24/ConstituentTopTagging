@@ -104,7 +104,7 @@ class BaseTrainer:
             batch_size=self.batchSize,
             validation_data=self.dvalid,
             callbacks=callbacks,
-            verbose=1
+            verbose=0
         )
 
         # Return train history
@@ -121,4 +121,4 @@ class BaseTrainer:
         (array) - The array of predictions over the validation set
         """
 
-        return self.model.predict(self.dvalid, self.batchSize, verbose=1)
+        return self.model.predict(self.dvalid, self.batchSize, verbose=0)

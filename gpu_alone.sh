@@ -30,7 +30,7 @@ do
     # Finally we need to figure out which fold of the training data we
     # will reserve for validation. This will just be the run number modulo
     # the number of folds (set below)
-    numfolds=5
+    numfolds=10
     fold=`expr $runname % $numfolds`
 
     # Now that we have all of our run information, make directory tree
@@ -56,14 +56,14 @@ do
 	ls -lrth
 
 	# Next build command to run python training script
-	command="python ${homedir}/kf_train.py --numFolds ${numfolds} --fold ${fold} --type efn --phisizes 80 80 --fsizes 80 50 25 10 --numEpochs 50 --maxConstits 80"
+	command="python ${homedir}/kf_train.py --numFolds ${numfolds} --fold ${fold} --type pfn --phisizes 250 250 250 --fsizes 500 500 500 --latent_dropout 0.084 --dropout 0.036 -lr 7.9e-5 -b 256 --numEpochs 50 --maxConstits 80"
 	# command="python ${homedir}/pr_train.py --type efn --phisizes 80 80 --fsizes 80 50 25 10 --numEpochs 100"
 	# command="python ${homedir}/up_train.py --numFolds ${numfolds} --fold ${fold} --type efn --phisizes 80 80 --fsizes 80 50 25 10 --numEpochs 50 --maxConstits 80"
 
 	# Run command
 	echo "================================"
 	echo "Will run command ${command}"
-	# $command
+	$command
 	echo -e "\nDone!"
 
     } > ${trdir}/output.log 2>${trdir}/error.log
