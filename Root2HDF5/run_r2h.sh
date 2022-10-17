@@ -10,12 +10,12 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 
-#SBATCH --mem=20G
+#SBATCH --mem=10G
 
-#SBATCH --output=data_gen_ln.out 
-#SBATCH --error=data_gen_ln.err
+#SBATCH --output=data_gen.out 
+#SBATCH --error=data_gen.err
 
 #SBATCH --mail-user=kgreif@uci.edu
 #SBATCH --mail-type=ALL
 
-python r2h_lognorm.py
+python r2h_syst.py
