@@ -9,7 +9,6 @@ python3
 
 import ray
 from ray import tune
-from ray.tune.schedulers import MedianStoppingRule
 from ray.tune.schedulers import ASHAScheduler
 from ray.tune.suggest import ConcurrencyLimiter
 from ray.tune.suggest.hyperopt import HyperOptSearch
@@ -45,11 +44,11 @@ space = {
 }
 
 # Attach ray cluster
-ray.init(address='auto')
+# ray.init(address='auto')
+ray.init(num_cpus=3)
 
 # Make search algorithm
 algo = HyperOptSearch(
-    space,
     metric='score',
     mode='min'
 )
@@ -77,7 +76,7 @@ analysis = tune.run(
     checkpoint_score_attr='min-score',
     stop={'training_iteration': max_epochs},
     resources_per_trial={'cpu': 1, 'gpu': 1},
-    local_dir='/pub/kgreif/tt_model_repo',
+    local_dir='/DFS-L/DATA/whiteson/kgreif/tt_model_repo',
     verbose=1
 )
 

@@ -58,7 +58,7 @@ def build_model(setup, sample_shape, summary=True):
         model.add(tf.keras.layers.Dense(
             1,
             kernel_initializer='glorot_uniform',
-            kernel_regularizer=tf.keras.regularizers.l1(l1=setup['l1reg']),
+            # kernel_regularizer=tf.keras.regularizers.l1(l1=setup['l1reg']),
             activation='sigmoid')
         )
 
@@ -76,7 +76,7 @@ def build_model(setup, sample_shape, summary=True):
     elif setup['type'] == 'efn':
 
         model = EFN(
-            input_dim=2,
+            input_dim=5,
             Phi_sizes=tuple(setup['phisizes']),
             F_sizes=tuple(setup['fsizes']),
             Phi_acts="relu",
@@ -96,7 +96,7 @@ def build_model(setup, sample_shape, summary=True):
     elif setup['type'] == 'pfn':
 
         model = PFN(
-            input_dim=4,
+            input_dim=10,
             Phi_sizes=tuple(setup['phisizes']),
             F_sizes=tuple(setup['fsizes']),
             Phi_acts="relu",
@@ -104,9 +104,9 @@ def build_model(setup, sample_shape, summary=True):
             Phi_k_inits="glorot_normal",
             F_k_inits="glorot_normal",
             latent_dropout=setup['latent_dropout'],
-            F_dropouts=setup['f_dropout'],
-            Phi_l2_regs=setup['phi_reg'],
-            F_l2_regs=setup['f_reg'],
+            F_dropouts=setup['dropout'],
+            Phi_l2_regs=0,
+            F_l2_regs=0,
             mask_val=0,
             loss="binary_crossentropy",
             optimizer=tf.keras.optimizers.Adam(learning_rate=setup['learningRate']),

@@ -134,11 +134,12 @@ def get_particle_net(num_classes, input_shapes, setup):
     setting = _DotDict()
     setting.num_class = num_classes
     # conv_params: list of tuple in the format (K, (C1, C2, C3))
-    setting.conv_params = [(int(setup['knn']), (int(setup['blocks']['convs'][i]),) * int(setup['block_depth'])) for i in range(int(setup['blocks']['n_blocks']))]
+    setting.conv_params = [(int(setup['knn']), (int(setup['convs'][i]),) * int(setup['block_depth'][i])) for i in range(int(setup['n_blocks']))]
+    print(setting.conv_params)
     # conv_pooling: 'average' or 'max'
     setting.conv_pooling = setup['pooling']
     # fc_params: list of tuples in the format (C, drop_rate)
-    setting.fc_params = [(setup['nodes'], setup['dropout'])]
+    setting.fc_params = [(setup['nodes'][0], setup['dropout'])]
     setting.num_points = input_shapes['points'][0]
 
     points = keras.Input(name='points', shape=input_shapes['points'])
