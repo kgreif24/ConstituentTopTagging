@@ -164,7 +164,7 @@ class DataLoader(Sequence):
             batch_labels = self.file['labels'][batch_start:batch_stop]
 
         # Finally package everything into a tuple and return
-        return batch_data, batch_labels, batch_weights
+        return batch_data, batch_labels
 
 
 if __name__ == '__main__':

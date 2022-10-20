@@ -96,7 +96,7 @@ def build_model(setup, sample_shape, summary=True):
     elif setup['type'] == 'pfn':
 
         model = PFN(
-            input_dim=10,
+            input_dim=4,
             Phi_sizes=tuple(setup['phisizes']),
             F_sizes=tuple(setup['fsizes']),
             Phi_acts="relu",

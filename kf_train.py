@@ -75,7 +75,7 @@ print(args.block_depth)
 setup = vars(args)
 
 # Define training data location
-file = '/scratch/whiteson_group/kgreif/train_s2_ln.h5'
+file = '/scratch/whiteson_group/kgreif/dijet_esup_train.h5'
 
 # Create ModelTrainer instance
 mt = ModelTrainer(setup, file)
@@ -84,4 +84,4 @@ mt = ModelTrainer(setup, file)
 plots = './plots'
 checks = './checkpoints'
 logs = './logs'
-mt.routine(plots, checks, logs, patience=24, use_schedule=args.schedule)
+mt.routine(plots, checks, logs, patience=10, use_schedule=args.schedule)

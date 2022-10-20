@@ -10,7 +10,8 @@ python3
 import numpy as np
 import tensorflow as tf
 
-from data_loader import DataLoader
+# from data_loader import DataLoader
+from dl_syst import DataLoader
 import models
 
 class BaseTrainer:
@@ -59,7 +60,6 @@ class BaseTrainer:
         self.dtrain = DataLoader(
             datafile,
             batch_size=self.batchSize,
-            net_type=setup['type'],
             max_constits=setup['maxConstits'],
             max_jets=setup['maxJets'],
             num_folds=setup['numFolds'],
@@ -70,7 +70,6 @@ class BaseTrainer:
         self.dvalid = DataLoader(
             datafile,
             batch_size=self.batchSize,
-            net_type=setup['type'],
             max_constits=setup['maxConstits'],
             max_jets=setup['maxJets'],
             num_folds=setup['numFolds'],
