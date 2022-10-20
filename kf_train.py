@@ -66,22 +66,21 @@ parser.add_argument('--numFolds', default=5, type=int,
                     help='Number of folds used in training run')
 parser.add_argument('--fold', default=None, type=int,
                     help='The fold being used in this particular job')
+parser.add_argument('--file', default=None, required=True, type=str,
+                    help='The file to be used for training')
+parser.add_argument('--dir', default=None, required=True, type=str,
+                    help='The directory to be used for placing training output')
+parser.add_argument('--logdir', default='.', type=str,
+                    help='The directory to be used for placing tensorboard logs')
 args = parser.parse_args()
-
-print(args.convs)
-print(args.block_depth)
 
 # Convert args namespace to dict to use in building model
 setup = vars(args)
 
-# Define training data location
-file = '/scratch/whiteson_group/kgreif/dijet_esup_train.h5'
-
 # Create ModelTrainer instance
-mt = ModelTrainer(setup, file)
+mt = ModelTrainer(setup, args.file)
 
 # Run routine
-plots = './plots'
-checks = './checkpoints'
-logs = './logs'
-mt.routine(plots, checks, logs, patience=10, use_schedule=args.schedule)
+plots = args.dir + '/plots'
+checks = args.dir + '/checkpoints'
+mt.routine(plots, checks, args.logdir, patience=24, use_schedule=args.schedule)

@@ -5,14 +5,14 @@
 
 # Set up sbatch arguments
 
-#SBATCH --job-name=test                           ## Name of the job.
+#SBATCH --job-name=PNETs2                         ## Name of the job.
 #SBATCH -A kgreif                                 ## account to charge 
 #SBATCH -p free-gpu                               ## partition/queue name
 #SBATCH --gres=gpu:V100:1                         ## Use only 1 GPU
 #SBATCH --nodes=1                                 ## (-N) number of nodes to use
 #SBATCH --tmp=80G                                 ## Request 80GB of scratch to hold data
 
-#SBATCH --array=1-1
+#SBATCH --array=1-5
 
 #SBATCH --error=./outfiles/%x_%a.err       ## error log file
 #SBATCH --output=./outfiles/%x_%a.out      ## output file
@@ -22,6 +22,7 @@
 
 # Set tmpdir to correct location
 export TMPDIR=/tmp/tt_data
+trainname="$TMPDIR/train_${SLURM_ARRAY_TASK_ID}.h5"
 mkdir -p $TMPDIR 
 
 # Print out hostname and date of job
@@ -34,7 +35,7 @@ echo "================================"
 
 # Transfer file from disk to scratch
 echo "Now transferring file from /pub to /tmp"
-cp /pub/kgreif/samples/h5dat/train_mc_m.h5 $TMPDIR
+cp /pub/kgreif/samples/h5dat/train_s2_ln.h5 ${trainname}
 ls $TMPDIR 
 
 # Set up directory tree
@@ -52,7 +53,7 @@ echo "In directory ${trdir}"
 ls -lrth
 
 # Next build command to run python training script
-command="python ${homedir}/kf_train.py --numFolds 5 --fold ${SLURM_ARRAY_TASK_ID} --type pfn --phisizes 90 90 --fsizes 90 90 --numEpochs 1"
+command="python ${homedir}/kf_train.py --numFolds 10 --fold ${SLURM_ARRAY_TASK_ID} --type pnet --n_blocks 3 --convs 64 224 384 --block_depth 3 3 3 --pooling max --nodes 125 --dropout 0.1 -lr 4.2e-4 -b 256 -N 50 --file ${trainname} --dir ${trdir} --logdir ${logdir}"
 
 # Run command
 echo "================================"
