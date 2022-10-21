@@ -16,7 +16,10 @@ from model_trainer import ModelTrainer
 
 # If GPU is available, print message
 print("\nStart model training script...")
-print("Num GPUs Available:", len(tf.config.list_physical_devices('GPU')))
+gpus = tf.config.list_physical_devices('GPU')
+print("Num GPUs Available:", len(gpus))
+for gpu in gpus:
+    tf.config.experimental.set_memory_growth(gpu, True)
 
 ########################## Setup ###########################
 
