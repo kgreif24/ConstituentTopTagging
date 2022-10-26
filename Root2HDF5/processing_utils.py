@@ -14,19 +14,31 @@ import awkward as ak
 # import hep_ml.reweight as reweight
 
 
-def find_raw_len(filename):
+def find_raw_len(filename, test_branch, flatten):
     """ find_len - Take in a path to a .root file and returns the number
     of events in that file.
 
     Arguments:
     filename (string) - The path to the file (including tree name)
+    test_branch (string) - Name of the branch we should use for getting # of jets
+    flatten (bool) - If true, must flatten branch before counting jets
 
     Returns
     (int) - The number of events
     """
 
     events = uproot.open(filename)
-    return ak.num(events['fjet_pt'], axis=0)
+
+    # Get test branch, and drop 3rd+ jets
+    tb = events[test_branch].array()
+    tb = tb[:,:2]
+
+    # Count the number of jets we have left
+    if flatten:
+        count = ak.sum(ak.count(tb, axis=1))
+    else:
+        count = ak.sum(ak.count(tb, axis=0))
+    return count
 
 
 def find_cut_len(filename, cut_branches, cut_func):
@@ -54,16 +66,16 @@ def find_cut_len(filename, cut_branches, cut_func):
 
 def find_h5_len(filename):
     """ find_h5_len - Take in a path to a .h5 file and returns the length of
-    the fjet_pt data set.
+    the data set.
 
     Arguments:
     filename (string) - The path to the file
 
     Returns
-    (int) - The length of the fjet_pt dataset
+    (int) - The length of the dataset
     """
     f = h5py.File(filename, 'r')
-    return f['fjet_pt'].shape[0]
+    return f.attrs.get('num_jets')
 
 
 def flat_weights(pt, n_bins=200, **kwargs):
@@ -128,12 +140,13 @@ def match_weights(pt, target, n_bins=200):
 def calc_weights(file, weight_func):
     """ calc_weights - This function calculates weights to adjust the pT spectrum of
     the h5 file passed in as arguments. Applies the weight calculation function
-    given by weight_func. This function takes pt as an argument and returns weights.
+    given by weight_func. Currently only setup to reweight the background pT
+    spectrum.
 
     Arguments:
     file (obj) - The file to calculate weights for, must be writable
-    weight_func (function) - The function used to calculate weights. Must take in a
-    vector of jet pt and return jet weights.
+    weight_func (function) - The function used to calculate weights. Must take in
+    vectors of background and signal jet pT
 
     Returns:
     None
@@ -151,7 +164,7 @@ def calc_weights(file, weight_func):
     sig_pt = pt[sig_ind]
     bkg_pt = pt[bkg_ind]
 
-    # Calculate weights for signal
+    # Calculate weights for background
     bkg_weights = weight_func(bkg_pt, sig_pt)
 
     # Assemble single vector of weights
@@ -164,152 +177,32 @@ def calc_weights(file, weight_func):
     weight_data[:] = weights
 
 
-def send_data(file_list, target, hl_means, hl_stddevs):
-    """ send_data - This function takes in a list of intermediate .h5 files and from
-    them constructs train/test files with stacked constituent and hl information. It
-    will also transfer over label, pt, and image information.
+def calc_weights_solo(file, weight_func):
+    """ calc_weights - This function calculates weights to adjust the pT spectrum of
+    the h5 file passed in as arguments. Applies the weight calculation function
+    given by weight_func. This solo version of the function is meant for when
+    there is no signal and background distinction.
 
     Arguments:
-    file_list (list) - A list containing strings giving the path of files to add
-    target (obj) - h5 file object for the target file. Assumes we have write permissions
-    and that the dataset structure of target is exactly the same as the source files.
-    hl_means (list) - A list of hl means to apply in standardization
-    hl_stddevs (list) - A list of hl std. deviations to apply in standardization. Must
-    have the same length as the number of hl vars.
+    file (obj) - The file to calculate weights for, must be writable
+    weight_func (function) - The function used to calculate weights. Must take in
+    a vector of jet pT
 
     Returns:
     None
     """
 
-    # Start counter to keep track of write index in target file
-    start_index = 0
+    # Pull info from file
+    num_jets = file.attrs.get("num_jets")
+    pt = file['jet_true'][:,3]
 
-    # Loop through file list
-    for i, file_name in enumerate(file_list):
-        print("Now processing file:", file_name)
+    # Calculate weights
+    weights = weight_func(pt)
 
-        # Open file
-        file = h5py.File(file_name, 'r')
-        num_file_jets = file.attrs.get("num_jets")
-        stop_index = start_index + num_file_jets
-
-        # Extract dataset names from attributes
-        constit_branches = file.attrs.get('constit')
-        hl_branches = file.attrs.get('hl')
-        image_branch = file.attrs.get('img')
-        pt_branch = file.attrs.get('pt')
-        label_branch = file.attrs.get('label')
-        unstacked = np.concatenate((image_branch, pt_branch, label_branch))
-
-        # Get random seed for our shuffles
-        rng_seed = np.random.default_rng()
-        rseed = rng_seed.integers(1000)
-
-        # Constituents
-        print("Processing constituents")
-        constit_list = []
-
-        for cons in constit_branches:
-            this_cons = file[cons][...]
-            branch_shuffle(this_cons, seed=rseed)
-            constit_list.append(this_cons)
-
-        # Stack all constituents along last axis here
-        constits = np.stack(constit_list, axis=-1)
-        # And write to target file
-        target['constit'][start_index:stop_index,...] = constits
-        del constits
-
-        # HL variables
-        print("Processing hl vars")
-        hlvars_list = []
-
-        for var, mean, stddev in zip(hl_branches, hl_means, hl_stddevs):
-            this_var = file[var][:]
-            branch_shuffle(this_var, seed=rseed)
-
-            # Catch for annoying ECF functions which have large magnitudes
-            if var == 'fjet_ECF3':
-                this_var /= 1e10
-            elif var == 'fjet_ECF2':
-                this_var /= 1e6
-
-            # Standardize variable using information passed in as argument
-            stan_var = (this_var - mean) / stddev
-            hlvars_list.append(stan_var)
-
-        # Stack all hl variables
-        hlvars = np.stack(hlvars_list, axis=-1)
-        # And write to target file
-        target['hl'][start_index:stop_index,...] = hlvars
-        del hlvars
-
-        # Other information, including images, labels, and jet pT
-        print("Processing images, labels, and pT")
-        for branch in unstacked:
-            dataset = file[branch][...]
-            branch_shuffle(dataset, seed=rseed)
-            target[branch][start_index:stop_index,...] = dataset
-
-        # Increment counters and close file
-        start_index = stop_index
-        file.close()
-
-    # End by printing summary of how many jets were written to file
-    print("We wrote", stop_index, "jets to target file")
-    target.attrs.modify("num_jets", stop_index)
-
-
-def unstacked_send(file_list, target):
-    """ unstacked_send - The same function as above, except it skips the stacking
-    and hl variable standardization steps. This is for use in generating the
-    public facing data set.
-
-    Arguments:
-    file_list (list) - List of paths to intermediate files
-    target (string) - The target file h5py object
-
-    Returns:
-    None
-    """
-
-    # Start counter to keep track of write index in target file
-    start_index = 0
-
-    # Loop through file list
-    for i, file_name in enumerate(file_list):
-        print("Now processing file:", file_name)
-
-        # Open file
-        file = h5py.File(file_name, 'r')
-        num_file_jets = file.attrs.get("num_jets")
-        stop_index = start_index + num_file_jets
-
-        # Extract dataset names from attributes
-        constit_branches = file.attrs.get('constit')
-        hl_branches = file.attrs.get('hl')
-        jet_branches = file.attrs.get('pt')
-        label_branch = file.attrs.get('label')
-        unstacked = np.concatenate((constit_branches, hl_branches, jet_branches, label_branch))
-
-        # Get random seed for our shuffles
-        rng_seed = np.random.default_rng()
-        rseed = rng_seed.integers(1000)
-
-        # Process data
-        for var in unstacked:
-            this_var = file[var][...]
-            branch_shuffle(this_var, seed=rseed)
-            target[var][start_index:stop_index,...] = this_var
-
-        # Increment counters and close file
-        start_index = stop_index
-        file.close()
-
-    # End by printing summary of how many jets were written to file
-    print("We wrote", stop_index, "jets to target file")
-    target.attrs.modify("num_jets", stop_index)
-
+    # Create new dataset in file
+    weight_shape = (num_jets,)
+    weight_data = file.create_dataset("weights", shape=weight_shape, dtype='f4')
+    weight_data[:] = weights
 
 
 def branch_shuffle(branch, seed=42):
@@ -375,13 +268,14 @@ def calc_standards(file):
     return means_list, stddevs_list
 
 
-def common_cuts(batch):
+def common_cuts(batch, exit_check=[]):
     """ common_cuts - This function will take in a batch of data (almost always as loaded)
     by uproot.iterate and apply the common cuts for Rel22. For when data format does not
     allow uproot to do this for us.
 
     Arguments:
     batch (obj or dict) - The batch, where branches are accessible by string names
+    exit_check (list of strings) - The names of branches we wish to check for -999 exit codes
 
     Returns:
     (array) - A boolean array of len branch.shape[0]. If True, jet passes common cuts
@@ -391,25 +285,12 @@ def common_cuts(batch):
     cuts = []
     cuts.append(abs(batch['fjet_truthJet_eta']) < 2.0)
     cuts.append(batch['fjet_truthJet_pt'] / 1000. > 350.)
-    cuts.append(batch['fjet_numConstituents'] > 3)
+    cuts.append(batch['fjet_numConstituents'] >= 3)
     cuts.append(batch['fjet_m'] / 1000. > 40.)
 
-    # Going to also include cuts on hl var exit codes here
-    cuts.append(batch['fjet_Tau1_wta'] != -999)
-    cuts.append(batch['fjet_Tau2_wta'] != -999)
-    cuts.append(batch['fjet_Tau3_wta'] != -999)
-    cuts.append(batch['fjet_Tau4_wta'] != -999)
-    cuts.append(batch['fjet_Split12'] != -999)
-    cuts.append(batch['fjet_Split23'] != -999)
-    cuts.append(batch['fjet_ECF1'] != -999)
-    cuts.append(batch['fjet_ECF2'] != -999)
-    cuts.append(batch['fjet_ECF3'] != -999)
-    cuts.append(batch['fjet_C2'] != -999)
-    cuts.append(batch['fjet_D2'] != -999)
-    cuts.append(batch['fjet_Qw'] != -999)
-    cuts.append(batch['fjet_L2'] != -999)
-    cuts.append(batch['fjet_L3'] != -999)
-    cuts.append(batch['fjet_ThrustMaj'] != -999)
+    # Look for exit codes
+    for var in exit_check:
+        cuts.append(batch[var] != -999)
 
     # Take and of all cuts
     total_cuts = np.logical_and.reduce(cuts)
@@ -418,7 +299,7 @@ def common_cuts(batch):
 
 
 def signal_cuts(batch):
-    """ signal_cuts - Call the above function to produce the common cuts, but
+    """ signal_cuts - Calls the above function to produce the common cuts, but
     also adds a set of signal cuts which should be applied to the Z' sample.
 
     Arguments:
@@ -437,6 +318,31 @@ def signal_cuts(batch):
     cuts.append(batch['fjet_ungroomed_truthJet_m'] / 1000. > 140.)
     cuts.append(batch['fjet_truthJet_ungroomedParent_GhostBHadronsFinalCount'] >= 1)
     cuts.append(batch['fjet_ungroomed_truthJet_Split23'] / 1000. > np.exp(3.3-6.98e-4*batch['fjet_ungroomed_truthJet_pt']/1000.))
+
+    # Take and of all cuts
+    total_cuts = np.logical_and.reduce(cuts)
+
+    return total_cuts
+
+
+def trans_cuts(batch):
+    """ trans_cuts - Implements the cuts we will use for both signal and
+    background for the Delphes data used in the transfer learning
+    project.
+
+    Arugments:
+    batch (obj or dict) - The batch of jets for which to compute cuts
+
+    Returns:
+    (array) - Boolean array representing total cuts
+    """
+
+    # Assemble boolean arrays
+    cuts = []
+    cuts.append(abs(batch['fjet_eta']) < 2.0)
+    cuts.append(batch['fjet_pt'] > 350000)
+    cuts.append(batch['fjet_numConstits'] >= 3)
+    cuts.append(batch['fjet_m'] > 40)
 
     # Take and of all cuts
     total_cuts = np.logical_and.reduce(cuts)
@@ -469,23 +375,87 @@ def count_sig(raw_batch, sig=False):
     return np.count_nonzero(cuts)
 
 
-def calc_jets(jets):
-    """ calc_jets - This function will calculate jet level quantities, namely
-    the energy, pT, and mass from the constituent 4 vectors contained in a
-    jet batch. Used to recalculate jet level quantities after systematic
-    variations have been applied to the constituents.
+def encode_onehot(y, n_classes):
+    """ encode_onehot - This function performs onehot encoding on the branches of
+    the batch dict which are given in the "names" array. The number of classes
+    are passed in as a vector of the same length as "names".
+
+    Code inspired by the tf.keras.utils.to_categorical function, which I couldn't
+    be bothered to get to compile with ROOT!
 
     Arguments:
-    jets (dict): The jet batch, at a minimum must have constituent pT, eta,
-    phi, energy information
+    batch (dict) - The dictionary of jet information
+    names (array of strings) - The names of the branches to one hot encode
+    n_classes (array of ints) - The number of classes in each encoding
 
     Returns:
-    (dict): A dictionary containing vectors of the calculated quantities
+    (dict) - A dictionary with the structure {name: onehot_encoded_branch}
     """
 
-    # First find px, py, pz from pT, phi, and eta
-    px = jets['fjet_clus_pt'] * np.cos(jets['fjet_clus_phi'])
-    py = jets['fjet_clus_pt'] * np.sin(jets['fjet_clus_phi'])
-    pz = jets['fjet_clus_pt'] * np.sinh(jets['fjet_clus_eta'])
+    # Convert data to integers and find shape
+    y = np.array(y, dtype=np.int32)
+    input_shape = y.shape
 
-    # More thought must be placed here...
+    # Unravel array
+    y = y.ravel()
+    n = y.shape[0]
+
+    # Build categorical array
+    categorical = np.zeros((n, n_classes), dtype=np.int32)
+    categorical[np.arange(n), y] = 1
+
+    # Find output shape and reshape categorical
+    output_shape = input_shape + (n_classes,)
+    categorical = np.reshape(categorical, output_shape)
+
+    return categorical
+
+
+def stack_branches(file_list, branches, **kwargs):
+    """ stack_branches - This function pull the branches lited in the "branches"
+    argument, and stacks them along a new axis. The new axis is added to the end
+    of the return array. Shuffling is applied uniformly to each branch
+
+    Arguments:
+    file (list of h5 file objects) - The files we wish to pull data from and stack.
+    Each must have the branches given.
+    branches (list of string) - The branches we wish to stack
+    seed (int) - kwargs passed to branch_shuffle function
+
+    Returns:
+    (array) - Numpy array of the stacked data
+    """
+
+    data_list = []
+
+    for var in branches:
+
+        concat_list = []
+
+        for file in file_list:
+            data = file[var][...]
+            concat_list.append(data)
+
+        whole_data = np.concatenate(concat_list, axis=0)
+        branch_shuffle(whole_data, **kwargs)
+
+        data_list.append(whole_data)
+    
+    return np.stack(data_list, axis=-1)  
+
+
+def branch_shuffle(branch, seed=42):
+    """ branch_shuffle - This shuffle takes in a dataset represented by a numpy array,
+    as well as a seed for a random generator. It will then shuffle the branch using numpys
+    random shuffle routine.
+
+    Arguments:
+    branch (array) - The array to shuffle along the first dimension
+    seed (int) - The random seed to use in shuffling
+
+    Returns:
+    None - array is shuffled in place
+    """
+
+    rng = np.random.default_rng(seed)
+    rng.shuffle(branch, axis=0)

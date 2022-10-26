@@ -1,3 +1,6 @@
 [submodule "lib/CLI11"]
 	path = lib/CLI11
 	url = https://github.com/CLIUtils/CLI11.git
+[submodule "Root2HDF5"]
+	path = Root2HDF5
+	url = https://github.com/kgreif24/Root2HDF5.git

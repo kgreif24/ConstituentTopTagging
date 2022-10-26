@@ -1,11 +1,10 @@
 """ root_converter.py - This file defines the RootConverter class, which is
-the class responsible for looping over a list of .root dumper output files
+the class responsible for looping over a list of .root files
 and converting them into the h5 file format. A single dataset can
-subsequently be built by shuffling the .h5 output files. See README of
-data_processing submodule for details.
+subsequently be built by shuffling the .h5 output files.
 
 Author: Kevin Greif
-Last updated 7/1/2022
+Last updated 9/26/2022
 python3
 """
 
@@ -16,7 +15,6 @@ import ROOT
 import awkward as ak
 import processing_utils as pu
 import preprocessing as pp
-import syst_variations as syst
 
 class RootConverter:
     """ RootConverter - This class' methods handle the conversion of jet
@@ -43,9 +41,18 @@ class RootConverter:
         # Because files come from different pt slices, we need to pull a
         # representative sample of each file for our train/test data sets.
         # Find number of jets we expect to pull from each file
-        cb = self.params['cut_branches'] + self.params['hl_branches']
+        cb = self.params['cut_branches']
         cf = self.params['cut_func']
-        raw_file_events = [pu.find_cut_len(name, cb, cf) for name in self.files]
+
+        if cf != None:
+            raw_file_events = [pu.find_cut_len(name, cb, cf) for name in self.files]
+        else:
+            raw_file_events = [pu.find_raw_len(
+                name,
+                self.params['test_name'],
+                self.params['flatten']
+            ) for name in self.files]
+
         self.raw_file_events = np.array(raw_file_events)
         self.raw_events = np.sum(self.raw_file_events)
         print("We have", self.raw_events, "jets in total")
@@ -68,8 +75,8 @@ class RootConverter:
         # Lastly load cluster systematics map, if needed.
         # Simply hard code the location of the systematics map on gpatlas
         if self.params['syst_func'] != None:
-            syst_loc = '/DFS-L/DATA/whiteson/kgreif/SystTaggingData/cluster_uncert_map_EM.root'
-            self.syst_map = ROOT.TFile(syst_loc, 'read')
+            self.syst_map = ROOT.TFile(self.params['syst_loc'], 'read')
+
 
 
     def build_files(self, max_size=4000000):
@@ -83,44 +90,41 @@ class RootConverter:
         None
         """
 
-        if self.params['rw_type'] == 'w':
-            print("Building .h5 files")
-        else:
-            print("Loading .h5 files")
-
         # Initialize list to accept file objects
         self.h5files = []
 
         # Loop through the number of files we want to create
         for file_num in range(self.params['n_targets']):
 
-            # Open file given rw type
-            filename = self.params['target_dir'] + "tt_dijet_samples_" + str(file_num) + ".h5"
-            file = h5py.File(filename, self.params['rw_type'])
+            # Open file
+            filename = self.params['target_dir'] + self.params['name_stem'] + str(file_num) + ".h5"
+            file = h5py.File(filename, 'w')
 
-            # For rw type of 'w', we rebuild all of our files from scratch
-            if self.params['rw_type'] == 'w':
+            # Create all datasets in file
+            constits_size = (max_size, self.params['max_constits'])
+            for br in self.params['t_constit_branches']:
+                file.create_dataset(br, constits_size, maxshape=constits_size, dtype='f4')
 
-                # Create all datasets in file
-                constits_size = (max_size, self.params['max_constits'])
-                for br in self.params['t_constit_branches']:
-                    file.create_dataset(br, constits_size, maxshape=constits_size, dtype='f4')
+            jet_size = (max_size,)
+            for br in self.params['t_jet_branches']:
+                file.create_dataset(br, jet_size, maxshape=jet_size, dtype='f4')
 
-                hl_size = (max_size,)
-                for br in self.params['hl_branches']:
-                    file.create_dataset(br, hl_size, maxshape=hl_size, dtype='f4')
+            for br, nc in zip(self.params['t_onehot_branches'], self.params['t_onehot_classes']):
+                oh_size = (max_size, self.params['max_constits'], nc)
+                file.create_dataset(br, oh_size, maxshape=oh_size, dtype='i4')
 
-                for br in self.params['jet_branches']:
-                    file.create_dataset(br, hl_size, maxshape=hl_size, dtype='f4')
+            for br in self.params['event_branches']:
+                file.create_dataset(br, jet_size, maxshape=jet_size, dtype='f4')
 
-                # Set file attributes
-                file.attrs.create('num_jets', 0, dtype='i4')
-                file.attrs.create('constit', self.params['t_constit_branches'])
-                file.attrs.create('hl', self.params['hl_branches'])
-                file.attrs.create('jet', self.params['jet_branches'])
-                file.attrs.create('max_constits', self.params['max_constits'])
+            # Set file attributes
+            file.attrs.create('num_jets', 0, dtype='i4')
+            file.attrs.create('constit', self.params['t_constit_branches'])
+            file.attrs.create('onehot', self.params['t_onehot_branches'])
+            file.attrs.create('jet', self.params['t_jet_branches'])
+            file.attrs.create('event', self.params['event_branches'])
+            file.attrs.create('max_constits', self.params['max_constits'])
 
-            # Add built or opened file to list
+            # Add file to list
             self.h5files.append(file)
 
 
@@ -132,13 +136,12 @@ class RootConverter:
         No arguments or returns.
         """
 
-        # Use values of h5 file attributes to find where to start writing in h5 file
-        self.start_index = np.array([targ_file.attrs.get("num_jets") for targ_file in self.h5files])
-        # And initialize counter to keep track of how many new jets we write
-        self.write_events = np.zeros(self.params['n_targets'])
+        # Vector of indeces for tracking where to write in file
+        self.start_index = np.zeros(self.params['n_targets'], dtype=np.int32)
+        # Vector of counters for tracking how many new jets we write
+        self.write_events = np.zeros(self.params['n_targets'], dtype=np.int32)
 
         print("\nStarting processing loop...")
-        print("Initial write positions:", self.start_index)
 
         # Loop through source files
         for num_source, ifile in enumerate(self.files):
@@ -153,69 +156,136 @@ class RootConverter:
             # Break flag
             hit_file_limit = False
 
-            # Iterate through the files using iterate, filtering out only branches we need
-            keep_branches = (self.params['s_constit_branches'] + self.params['hl_branches']
-                             + self.params['jet_branches'])
+            # Compile lists of branches for use in varying points in production
+            s_non_constit_branches = (
+                self.params['s_jet_branches'] + self.params['event_branches']
+            )
+            keep_branches = (
+                self.params['s_jet_branches'] + self.params['event_branches'] 
+                + self.params['s_constit_branches']
+            )
             source_branches = keep_branches + self.params['cut_branches']
+            t_non_constit_branches = (
+                self.params['t_jet_branches'] + self.params['event_branches']
+            )
+            target_branches = (
+                t_non_constit_branches + self.params['t_constit_branches']
+                + self.params['t_onehot_branches']
+            )
+
+            # Use uproot.iterate to loop through files
             for jet_batch in events.iterate(step_size="200 MB",
                                             filter_name=source_branches):
 
                 # Initialize batch data dictionary to accept information
                 batch_data = {}
 
+                ##################### Flatten #######################
+
+                # Loop over fields in jet batch
+                for kw in jet_batch.fields:
+
+                    # Get branch
+                    branch = jet_batch[kw]
+
+                    # If we have an event level branch, need to broadcast
+                    # array to jet level quantity shape before flattening
+                    if kw in self.params['event_branches']:
+                        assert(self.params['flatten'])
+                        jl_branch = jet_batch[self.params['test_name']]
+                        (branch, jl_branch) = ak.broadcast_arrays(
+                            branch,
+                            jl_branch
+                        )
+
+                    # If we are flattening, need to slice to keep only leading
+                    # 2 jets (assuming jets are sorted by decreasing pT),
+                    # and then flatten the branch with ak.flatten
+                    if self.params['flatten']:
+                        branch = branch[:,:2,...]
+                        branch = ak.flatten(branch, axis=1)
+
+                    # Send branch to batch dictionary
+                    batch_data[kw] = branch
+
                 ##################### Make Cuts #####################
 
-                cuts = self.params['cut_func'](jet_batch)
-                cut_batch = {kw: jet_batch[kw][cuts,...] for kw in keep_branches}
+                if self.params['cut_func'] != None:
+                    cuts = self.params['cut_func'](batch_data)
+                    batch_data = {kw: batch_data[kw][cuts,...] for kw in keep_branches}
+
+                #################### Fix Units ######################
+
+                # Send pT, E, m branches to GeV
+                for kw, branch in batch_data.items():
+                    if any(s in kw for s in ['_pt', '_E', '_m']):
+                        batch_data[kw] = branch / 1000 
 
                 #################### Apply Systs ####################
 
                 if self.params['syst_func'] != None:
 
-                    var_batch = self.params['syst_func'](cut_batch,
+                    var_batch = self.params['syst_func'](batch_data,
                                                          self.syst_map,
                                                          **kwargs)
-                    cut_batch.update(var_batch)
+                    batch_data.update(var_batch)
 
                 ################### Constituents ####################
 
                 # Get indeces to sort by increasing pt (will be inverted later)
                 pt_name = self.params['pt_name']
-                pt = cut_batch[pt_name]
+                pt = batch_data[pt_name]
                 pt_zero = ak.pad_none(pt, self.params['max_constits'], axis=1, clip=True)
-                pt_zero = ak.to_numpy(ak.fill_none(pt_zero, 0, axis=None))
+                pt_zero = ak.to_numpy(ak.fill_none(pt_zero, 0, axis=1))
                 sort_indeces = np.argsort(pt_zero, axis=1)
 
-                # Find indeces of very small (or zero) pt constituents
-                small_pt_indeces = np.asarray(pt_zero < 100).nonzero()
+                # Find indeces of constituents we wish to mask by setting
+                # to zero.
+                small_pt_indeces = np.asarray(pt_zero < self.params['mask_lim']).nonzero()
 
                 # Here call preprocessing function, as set in params dict.
                 # See class docstring for details
-                cons_batch = self.params['constit_func'](cut_batch,
+                cons_batch = self.params['constit_func'](batch_data,
                                                          sort_indeces,
                                                          small_pt_indeces,
                                                          self.params)
                 batch_data.update(cons_batch)
 
-                ####################### Jet ########################
+                ################## One Hot Encoding ##################
 
-                # Simply loop through jet branches, convert to numpy and add
-                # to batch_data dict
-                for name in self.params['jet_branches']:
+                # Call encode_onehot processing util if necessary
+                for name, nc in zip(self.params['t_onehot_branches'], self.params['t_onehot_classes']):
 
-                    branch = cut_batch[name]
-                    batch_data[name] = ak.to_numpy(branch)
+                    # Pull data from branch and convert to numpy
+                    data = batch_data[name]
+                    data = ak.pad_none(data, self.params['max_constits'], axis=1, clip=True)
+                    data = ak.to_numpy(ak.fill_none(data, 0, axis=1))
+
+                    # Call encoding util
+                    ohe = pu.encode_onehot(data, nc)
+
+                    # Mask all empty consituent slots
+                    extra_zeros = np.zeros(len(small_pt_indeces[0]), dtype=np.int32)
+                    mask_onehot = small_pt_indeces + (extra_zeros,)
+                    ohe[mask_onehot] = 0
+
+                    batch_data[name] = ohe
+
+                ####################### Jet + Event ########################
+
+                # Apply jet level preprocessing if needed
+                if self.params['jet_func'] != None:
+                    preprocessed_jets = self.params['jet_func'](batch_data)
+                    batch_data.update(preprocessed_jets)
+
+                # Loop through jet and event branches
+                for name in t_non_constit_branches:
+
+                    # Convert to numpy
+                    batch_data[name] = ak.to_numpy(batch_data[name])
 
                 # Also find batch length here
-                batch_length = batch_data[pt_name].shape[0]
-
-                ##################### High Level ###################
-
-                # The same process as jet variables
-                for name in self.params['hl_branches']:
-
-                    branch = cut_batch[name]
-                    batch_data[name] = ak.to_numpy(branch)
+                batch_length = pt_zero.shape[0]
 
                 ##################### Write ########################
 
@@ -230,7 +300,7 @@ class RootConverter:
                     # Set break flag
                     hit_file_limit = True
 
-                self.write_branches(batch_data, batch_length)
+                self.write_branches(batch_data, target_branches, batch_length)
 
                 #################### Increment ####################
 
@@ -249,12 +319,13 @@ class RootConverter:
             targ_file.attrs.modify("num_jets", num_jets)
 
 
-    def write_branches(self, batch, length):
+    def write_branches(self, batch, targets, length):
         """ write_branches - This function will write the branches contained
         in a batch to the target .h5 files.
 
         Arguments:
         batch (dict): A dictionary containing the batch of data to write
+        targets (list of strings): A list of the branches in dictionary to write
         length (int): The number of jets to write in this batch
 
         Returns:
@@ -264,14 +335,15 @@ class RootConverter:
         print("Number of jets to write in this batch:", length)
 
         # Loop over all target branches
-        for name, branch in batch.items():
+        for name in targets:
 
             # Split branch into n_targets pieces using np.array_split
-            branch_splits = np.array_split(branch[:length,...], self.params['n_targets'])
+            branch_splits = np.array_split(batch[name][:length,...], self.params['n_targets'])
 
             # Find length of each split and end indeces for writing
             split_lengths = [split.shape[0] for split in branch_splits]
             end_index = self.start_index + split_lengths
+
 
             # Loop through branch_splits and write to files
             iterable = zip(branch_splits, self.start_index, end_index)
@@ -310,10 +382,15 @@ class RootConverter:
             for branch in self.params['t_constit_branches']:
                 targ_file[branch].resize(constits_size)
 
-            hl_size_branches = (self.params['hl_branches']
-                                + self.params['jet_branches'])
-            for branch in hl_size_branches:
+            for branch in self.params['t_jet_branches']:
                 targ_file[branch].resize(hl_size)
+
+            for branch in self.params['event_branches']:
+                targ_file[branch].resize(hl_size)
+
+            for branch, nc in zip(self.params['t_onehot_branches'], self.params['t_onehot_classes']):
+                onehot_size = (self.start_index[file_num], self.params['max_constits'], nc)
+                targ_file[branch].resize(onehot_size)
 
 
     def run(self, **kwargs):
@@ -334,55 +411,3 @@ class RootConverter:
         print("Wrote", int(np.sum(self.write_events)), "jets")
         print("H5 jets written breakdown:", self.write_events)
         print("H5 jets total breakdown:", self.start_index)
-
-
-
-
-if __name__ == '__main__':
-
-    # Define convert_dict which is passed to RootConverter class
-    # This particular dict is set up to do raw conversion (no preprocessing)
-    convert_dict = {
-        'cut_func': pu.signal_cuts,
-        'trim': True,
-        'source_list': './dat/Zprime_taste.list',
-        'tree_name': ':FlatSubstructureJetTree',
-        'rw_type': 'w',
-        'max_constits': 200,
-        'target_dir': './dataloc/intermediates_test/',
-        'n_targets': 1,
-        'total': 10000,
-        'constit_func': pp.raw_preprocess,
-        'syst_func': None,
-        's_constit_branches': [
-            'fjet_clus_pt', 'fjet_clus_eta',
-            'fjet_clus_phi', 'fjet_clus_E',
-            'fjet_clus_taste'
-        ],
-        'pt_name': 'fjet_clus_pt',
-        'hl_branches': [
-            'fjet_Tau1_wta', 'fjet_Tau2_wta', 'fjet_Tau3_wta',
-            'fjet_Tau4_wta', 'fjet_Split12', 'fjet_Split23',
-            'fjet_ECF1', 'fjet_ECF2', 'fjet_ECF3', 'fjet_C2',
-            'fjet_D2', 'fjet_Qw', 'fjet_L2', 'fjet_L3',
-            'fjet_ThrustMaj'
-        ],
-        't_constit_branches': [
-            'fjet_clus_eta', 'fjet_clus_phi', 'fjet_clus_pt', 'fjet_clus_E',
-            'fjet_clus_taste'
-        ],
-        'jet_branches': ['fjet_pt', 'fjet_eta', 'fjet_phi', 'fjet_m'],
-        'cut_branches': [
-            'fjet_truthJet_eta', 'fjet_truthJet_pt', 'fjet_numConstituents', 'fjet_m',
-            'fjet_truth_dRmatched_particle_flavor', 'fjet_truth_dRmatched_particle_dR',
-            'fjet_truthJet_dRmatched_particle_dR_top_W_matched', 'fjet_ungroomed_truthJet_m',
-            'fjet_truthJet_ungroomedParent_GhostBHadronsFinalCount', 'fjet_ungroomed_truthJet_Split23',
-            'fjet_ungroomed_truthJet_pt'
-        ]
-    }
-
-    # Build the class
-    rc = RootConverter(convert_dict)
-
-    # Run main program
-    rc.run()

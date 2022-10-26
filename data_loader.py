@@ -1,5 +1,4 @@
-""" data_loader.py - This class will prepare data for input into models. It
-will return a keras data generator constructed with h5py's indexing.
+""" data_loader.py - This class will pipe data into the keras fit function.
 This will allow us to loop over an entire training dataset while only ever
 having a fraction of it loaded in memory.
 
@@ -8,7 +7,7 @@ so jets within a batch will always stay the same.
 
 Author: Kevin Greif
 python3
-Last updated 1/10/22
+Last updated 10/16/22
 """
 
 import h5py
@@ -31,6 +30,7 @@ class DataLoader(Sequence):
                  mode='train',
                  net_type='dnn',
                  max_constits=80,
+                 max_jets=-1,
                  num_folds=5,
                  this_fold=1):
         """ __init__ - Init function for this class. Will load in root file
@@ -45,6 +45,7 @@ class DataLoader(Sequence):
             valid gives only the valid fold, and test gives the entire dataset.
             net_type (string): Specifies the model specific data preparation to use
             max_constits (int): Number of constituents to include in constituent models
+            max_jets (int): Number of jets to use in train / valid sets
             num_folds (int): The number of folds data is split into
             this_fold (int): The number of the fold to use, 1-num_folds
 
@@ -62,23 +63,28 @@ class DataLoader(Sequence):
         self.file = h5py.File(file_path, 'r')
 
         # Once we have file loaded, we can pull the number of events
-        # Use the weights array since it is just a vector with length equal to
-        # the number of events
-        tot_events = len(self.file['weights'])
+        tot_events = self.file.attrs.get('num_jets')
 
         # Now we need to find the sample shape, depends on net_type
         if 'hl' in self.net_type:
             self.sample_shape = self.file['hl'].shape[1:]
+            self.load_taste = False
         elif self.net_type == 'resnet':
             self.sample_shape = (64, 64, 1)  # Simply hard code image dims
+            self.load_taste = False
         elif self.net_type == 'dnn':
-            self.sample_shape = (self.max_constits, 7)
+            self.sample_shape = (self.max_constits, 10)
+            self.load_taste = True
         elif self.net_type == 'efn':
+            # How to give taste info to EFN?
             self.sample_shape = (self.max_constits, 2)
+            self.load_taste = True
         elif self.net_type == 'pfn':
-            self.sample_shape = (self.max_constits, 4)
+            self.sample_shape = (self.max_constits, 10)
+            self.load_taste = True
         elif self.net_type == 'pnet':
-            self.sample_shape = (self.max_constits, 7)
+            self.sample_shape = (self.max_constits, 10)
+            self.load_taste = True
         else:
             raise ValueError("Model type not recognized!")
 
@@ -172,6 +178,9 @@ class DataLoader(Sequence):
             # Given this is true, we just index using a slice of the numpy array
             batch_indeces = self.indeces[start:stop]
             batch_data = self.file[data_key][batch_indeces,...]
+            if self.load_taste:
+                taste_data = self.file['fjet_clus_taste'][batch_indeces,...]
+                batch_data = np.concatenate([batch_data, taste_data], axis=2)
 
             # Resnet needs pt data for pixel intensity
             if self.net_type == 'resnet':
@@ -192,6 +201,9 @@ class DataLoader(Sequence):
             # as this number needs to be turned into the second number in a slice. What a mess.
             batch_stop = self.indeces[stop-1] + 1
             batch_data = self.file[data_key][batch_start:batch_stop,...]
+            if self.load_taste:
+                taste_data = self.file['fjet_clus_taste'][batch_start:batch_stop,...]
+                batch_data = np.concatenate([batch_data, taste_data], axis=2)
 
             # Again, resnet needs pt data for pixel intensity
             if self.net_type == 'resnet':
@@ -216,9 +228,12 @@ class DataLoader(Sequence):
         elif self.net_type == 'efn':
 
             # For EFNs, we need to split pT and angular information
-            pT = batch_data[:,:self.max_constits,0]
-            ang = batch_data[:,:self.max_constits,1:3]
-            shaped_data = [pT, ang]
+            # Dump in taste information just to see what happens
+            pT = batch_data[:,:self.max_constits,2]
+            ang = batch_data[:,:self.max_constits,0:2]
+            taste = batch_data[:,:self.max_constits,7:10]
+            phi_in = np.concatenate((ang, taste), axis=2)
+            shaped_data = [pT, phi_in]
 
         elif self.net_type == 'pfn':
 
@@ -251,7 +266,7 @@ class DataLoader(Sequence):
 
             # pnet expects a dictionary containing points, features, and a mask.
             # Points will be eta,phi information stacked along constituent axis
-            # Features will be (pT, eta, phi, E) information as passed to PFN
+            # Features will be (pT, eta, phi, E, taste) information as passed to PFN.
             # Mask will be pT information. Use this to allow code to process
             # variable length inputs.
             shaped_data = {}

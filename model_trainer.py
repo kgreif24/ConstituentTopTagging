@@ -47,7 +47,7 @@ class ModelTrainer(BaseTrainer):
         print("New learning rate:", schedule[epoch])
         return schedule[epoch]
 
-    def routine(self, plotdir, checkdir, patience=20, use_schedule=False):
+    def routine(self, plotdir, checkdir, logdir, patience=20, use_schedule=False):
         """ routine - This function will execute a training routine that
         plots things like model output and loss, evaluates complex metrics,
         and takes care of early stopping and checkpointing.
@@ -55,6 +55,7 @@ class ModelTrainer(BaseTrainer):
         Arguments:
         plotdir (string) - The directory in which to store plots
         checkdir (string) - The directory in which to store checkpoints
+        logdir (string) - The directory in which to store tensorboard logs
         patience (int) - The patience to use in the early stopping callback.
         schedule (bool) - If true, use lr scheduler using keras callback
 
@@ -100,7 +101,7 @@ class ModelTrainer(BaseTrainer):
 
         # Tensorboard
         tboard_callback = tf.keras.callbacks.TensorBoard(
-            log_dir='../logs'
+            log_dir=logdir
         )
         callbacks.append(tboard_callback)
 
