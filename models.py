@@ -13,7 +13,7 @@ from energyflow.archs import EFN, PFN
 import tensorflow as tf
 import numpy as np
 
-# from classification_models.tfkeras import Classifiers
+from classification_models.tfkeras import Classifiers
 from pnet.tf_keras_model import get_particle_net
 
 

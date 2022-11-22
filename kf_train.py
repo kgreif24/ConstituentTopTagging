@@ -58,8 +58,6 @@ parser.add_argument('-lr', '--learningRate', default=1e-4, type=float,
                     help='Initial learning rate to be used in training')
 parser.add_argument('--maxConstits', default=80, type=int,
                     help='Number of constituents to include per event')
-parser.add_argument('--maxJets', default=-1, type=int,
-                    help='Number of jets to use in train / valid sets')
 parser.add_argument('--schedule', default=0, type=int,
                     help='Set which lr scheduler to use, 1 for step, 2 for cycle')
 parser.add_argument('--numFolds', default=5, type=int,
