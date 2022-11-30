@@ -350,6 +350,30 @@ def trans_cuts(batch):
     return total_cuts
 
 
+def calib_cuts(batch):
+    """ calib_cuts - Implements the cuts used in the jet calibration project.
+    They just require jet eta less than 2.5.
+
+    Arguments:
+    batch (obj or dict) - The batch of jets for which to computer cuts
+
+    Returns:
+    (array) - Boolean array representing total cuts
+    """
+
+    # Assemble boolean arrays
+    eta = batch['jet_eta']
+    if 'var' in str(ak.type(eta)):
+        eta = ak.flatten(eta)
+    cuts = []
+    cuts.append(abs(eta) < 2.5)
+
+    # Take and of all cuts
+    total_cuts = np.logical_and.reduce(cuts)
+
+    return total_cuts
+
+
 def count_sig(raw_batch, sig=False):
     """ This function will count the number of jets in a raw batch (loaded from
     nTuple before flattening) after applying signal or common cuts.
