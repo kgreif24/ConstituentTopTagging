@@ -92,10 +92,10 @@ class ModelTrainer(BaseTrainer):
 
         # Checkpointing
         check_callback = tf.keras.callbacks.ModelCheckpoint(
-            filepath=checkdir,
+            filepath=checkdir + '/{epoch:02d}-{val_loss:.2f}',
             monitor='val_loss',
             mode='min',
-            save_best_only=True
+            save_best_only=False
         )
         callbacks.append(check_callback)
 

@@ -68,7 +68,7 @@ class DataLoader(Sequence):
             self.sample_shape = self.file['hl'].shape[1:]
             self.load_taste = False
         elif self.net_type == 'resnet':
-            self.sample_shape = (64, 64, 2)  # Simply hard code image dims
+            self.sample_shape = (64, 64, 1)  # Simply hard code image dims
             self.load_taste = False
         elif self.net_type == 'dnn':
             self.sample_shape = (self.max_constits, 10)
@@ -80,8 +80,8 @@ class DataLoader(Sequence):
             self.sample_shape = (self.max_constits, 7)
             self.load_taste = False
         elif self.net_type == 'pnet':
-            self.sample_shape = (self.max_constits, 10)
-            self.load_taste = True
+            self.sample_shape = (self.max_constits, 7)
+            self.load_taste = False
         else:
             raise ValueError("Model type not recognized!")
 
@@ -182,7 +182,6 @@ class DataLoader(Sequence):
             # Resnet needs pt data for pixel intensity
             if self.net_type == 'resnet':
                 batch_pt = self.file['constit'][batch_indeces,:,2]
-                batch_en = self.file['constit'][batch_indeces,:,3]
 
             # We also need to load labels and weights, since this conditional will only
             # occur if we are training
@@ -206,7 +205,6 @@ class DataLoader(Sequence):
             # Again, resnet needs pt data for pixel intensity
             if self.net_type == 'resnet':
                 batch_pt = self.file['constit'][batch_start:batch_stop,:,2]
-                batch_en = self.file['constit'][batch_start:batch_stop,:,3]
 
             # Now load labels and weights the regular way
             batch_labels = self.file['labels'][batch_start:batch_stop]
@@ -254,14 +252,12 @@ class DataLoader(Sequence):
             eta_index = np.ravel(batch_data[:,:,0])
             phi_index = np.ravel(batch_data[:,:,1])
             cons_pt = np.ravel(batch_pt)
-            cons_en = np.ravel(batch_en)
 
             # Build images, starting from a zero array and incrementing. Note
             # we use phi as our row coordinate and index from the bottom of the array.
             # This strange indexing makes jet images intuitive.
-            shaped_data = np.zeros((this_bs, 64, 64, 2), dtype=np.float32)
+            shaped_data = np.zeros((this_bs, 64, 64, 1), dtype=np.float32)
             np.add.at(shaped_data, (jet_index, -1*phi_index, eta_index, 0), cons_pt)
-            np.add.at(shaped_data, (jet_index, -1*phi_index, eta_index, 0), cons_en)
 
         elif self.net_type == 'pnet':
 
