@@ -75,7 +75,7 @@ def build_model(setup, sample_shape, summary=True):
     elif setup['type'] == 'efn':
 
         model = EFN(
-            input_dim=5,
+            input_dim=2,
             Phi_sizes=tuple(setup['phisizes']),
             F_sizes=tuple(setup['fsizes']),
             Phi_acts="relu",

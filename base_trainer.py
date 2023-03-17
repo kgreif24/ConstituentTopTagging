@@ -7,6 +7,9 @@ Last updated 1/4/22
 python3
 """
 
+import glob
+import os
+
 import numpy as np
 import tensorflow as tf
 
@@ -63,7 +66,8 @@ class BaseTrainer:
             max_constits=setup['maxConstits'],
             num_folds=setup['numFolds'],
             this_fold=fold,
-            mode='train'
+            mode='train',
+            use_weights=setup['no_weights']
         )
 
         self.dvalid = DataLoader(
@@ -73,12 +77,18 @@ class BaseTrainer:
             max_constits=setup['maxConstits'],
             num_folds=setup['numFolds'],
             this_fold=fold,
-            mode='valid'
+            mode='valid',
+            use_weights=setup['no_weights']
         )
 
         # Build model using models.py interface, or by simply loading tf model
-        if 'checkpoint' in setup:
-            self.model = tf.keras.models.load_model(setup['checkpoint'])
+        if setup['checkpoint'] != None:
+
+            # Take the newest checkpoint
+            checkpoints = glob.glob(setup['checkpoint'] + '/*')
+            checkpoints.sort(key=os.path.getmtime)
+            self.model = tf.keras.models.load_model(checkpoints[-1])
+
         else:
             self.model = models.build_model(setup, self.dtrain.sample_shape)
 

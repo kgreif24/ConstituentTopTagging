@@ -12,6 +12,7 @@ import sys, os
 import argparse
 
 # Package imports
+import h5py
 import sklearn.metrics as metrics
 import numpy as np
 
@@ -24,6 +25,9 @@ import matplotlib.pyplot as plt
 plt.style.use('~/mattyplotsalot/allpurpose.mplstyle')
 import colorcet as cc
 
+# Custom imports
+import plotting_utils as utils
+
 
 ########################## Parse Arguments ###########################
 
@@ -33,6 +37,8 @@ parser.add_argument('--file', default=None, type=str, nargs='+',
                     help='File name of network checkpoint')
 parser.add_argument('--names', default=None, type=str, nargs='+',
                     help='Names of model for plotting/saving')
+parser.add_argument('--weights', default=None, type=str, nargs='+',
+                    help='Name of weight vector in .h5 to apply')
 args = parser.parse_args()
 
 ###################### Set parameters #######################
@@ -40,10 +46,14 @@ args = parser.parse_args()
 # Net parameters
 net_file = args.file
 net_name = args.names
+weight_name = args.weights
+
+# Load .h5 file for pulling weights
+wf = h5py.File('/pub/kgreif/samples/h5dat/test_ln_nominal.h5')
 
 ############################# Evaluation Loop #############################
 
-for model_num, (file, name) in enumerate(zip(net_file, net_name)):
+for model_num, (file, name, wname) in enumerate(zip(net_file, net_name, weight_name)):
 
     # Load data from file
     evaluation = np.load(file)
@@ -52,24 +62,41 @@ for model_num, (file, name) in enumerate(zip(net_file, net_name)):
     labels = evaluation['labels']
     pt = evaluation['jet_pt']
 
+    # Load weights if weight exists in evaluation file, otherwise just use
+    # a vector of ones
+    if wname in evaluation.files:
+        weights = wf[wname][:]
+        assert len(weights) == len(labels)
+    else:
+        print("Weight vector does not exist! Using unweighted metrics")
+        weights = np.ones(len(labels))
+
     # Make a histogram of network output, separated into signal/background
     preds_sig = preds[labels == 1]
     preds_bkg = preds[labels == 0]
+    weights_sig = weights[labels == 1]
+    weights_bkg = weights[labels == 0]
     hist_bins = np.linspace(0, 1.0, 100)
 
+    preds_bkg = preds_bkg / (1 - preds_bkg)
+
     plt.figure(1)
-    plt.hist(preds_sig, bins=hist_bins, alpha=0.5, label='Signal')
-    plt.hist(preds_bkg, bins=hist_bins, alpha=0.5, label='Background')
-    plt.legend()
-    plt.ylabel("Counts")
-    plt.xlabel("Model output")
+    ax = plt.gca()
+    # plt.hist(preds_sig, bins=hist_bins, weights=weights_sig, alpha=1, label='Signal', density=True)
+    plt.hist(preds_bkg, bins=100, weights=weights_bkg, alpha=1, density=True)
+    # plt.legend()
+    plt.yscale('log')
+    plt.ylim(top=plt.ylim()[1]*20)
+    utils.add_atlas(ax, [r"$\sqrt{s} = 13$ TeV, Pythia8", r"anti-$k_t$, $R=1.0$ UFO SD Jets"])
+    plt.ylabel("A.U.")
+    plt.xlabel(r"SM $t\bar{t}$ Pythia $\rightarrow$ Herwig Weights")
     plt.savefig('./outfiles/' + name + '.png', dpi=300)
     plt.clf()
 
     # Get total ROC curve, AUC and ACC
-    fpr, tpr, thresholds = metrics.roc_curve(labels, preds)
-    auc = metrics.roc_auc_score(labels, preds)
-    acc = metrics.accuracy_score(labels, disc_preds)
+    fpr, tpr, thresholds = metrics.roc_curve(labels, preds, sample_weight=weights)
+    auc = metrics.roc_auc_score(labels, preds, sample_weight=weights)
+    acc = metrics.accuracy_score(labels, disc_preds, sample_weight=weights)
     fprinv = 1 / fpr
 
     # Plot inverse roc curve
@@ -109,9 +136,10 @@ for model_num, (file, name) in enumerate(zip(net_file, net_name)):
         # Now take a sub-sample of predictions within the pt bin
         bin_preds = preds[bin_indeces]
         bin_labels = labels[bin_indeces]
+        bin_weights = weights[bin_indeces]
 
         # Now we want to calculate background rejection at working points
-        fpr, tpr, thresholds = metrics.roc_curve(bin_labels, bin_preds)
+        fpr, tpr, thresholds = metrics.roc_curve(bin_labels, bin_preds, sample_weight=bin_weights)
         fprinv = 1 / fpr
         wp_p5 = np.argmax(tpr > 0.5)
         wp_p8 = np.argmax(tpr > 0.8)
@@ -144,15 +172,18 @@ for model_num, (file, name) in enumerate(zip(net_file, net_name)):
         # Take sub-sample of predictions within pt bin
         bin_preds = preds[bin_indeces]
         bin_labels = labels[bin_indeces]
+        bin_weights = weights[bin_indeces]
 
         # Split into sig/bkg
         bin_preds_sig = bin_preds[bin_labels==1]
         bin_preds_bkg = bin_preds[bin_labels==0]
+        bin_weights_sig = bin_weights[bin_labels==1]
+        bin_weights_bkg = bin_weights[bin_labels==0]
 
         # Make model output plot for this pt bin
         plt.figure(4)
-        plt.hist(bin_preds_sig, bins=hist_bins, alpha=0.5, label='Signal')
-        plt.hist(bin_preds_bkg, bins=hist_bins, alpha=0.5, label='Background')
+        plt.hist(bin_preds_sig, bins=hist_bins, weights=bin_weights, alpha=0.5, label='Signal')
+        plt.hist(bin_preds_bkg, bins=hist_bins, weights=bin_weights, alpha=0.5, label='Background')
         plt.legend()
         plt.ylabel("Counts")
         plt.xlabel("Model output")
@@ -162,7 +193,7 @@ for model_num, (file, name) in enumerate(zip(net_file, net_name)):
         plt.clf()
 
         # Now find roc curve in this pt bin
-        fpr, tpr, thresholds = metrics.roc_curve(bin_labels, bin_preds)
+        fpr, tpr, thresholds = metrics.roc_curve(bin_labels, bin_preds, sample_weight=bin_weights)
         fprinv = 1 / fpr
 
         # Plot roc curve
@@ -179,11 +210,17 @@ for model_num, (file, name) in enumerate(zip(net_file, net_name)):
     plt.savefig("./outfiles/" + name + "_binned_roc.png", dpi=300)
     plt.clf() # Make sure to clear figure for next model!
 
-
 # Add finishing touches to inverse roc plot
 plt.figure(2)
+ax = plt.gca()
+# Hack in a random guessing line
+tpr = np.linspace(0, 1, 200)
+fpr = tpr
+fprinv = 1 / fpr
+plt.plot(tpr, fprinv, '-', label='Random', color='k', alpha=0.5)
 plt.yscale('log')
 plt.legend()
+utils.add_atlas(ax, [r"$\sqrt{s} = 13$ TeV, Pythia8", r"anti-$k_t$, $R=1.0$ UFO SD Jets"])
 plt.ylabel('Background rejection')
 plt.xlabel('Signal efficiency')
 plt.savefig("./outfiles/roc.png", dpi=300)

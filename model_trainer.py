@@ -8,6 +8,9 @@ Last updated 1/4/22
 python3
 """
 
+import os
+import glob
+
 import tensorflow as tf
 import sklearn.metrics as metrics
 import numpy as np
@@ -92,10 +95,10 @@ class ModelTrainer(BaseTrainer):
 
         # Checkpointing
         check_callback = tf.keras.callbacks.ModelCheckpoint(
-            filepath=checkdir + '/{epoch:02d}-{val_loss:.2f}',
+            filepath=checkdir + '/{epoch:02d}-{val_loss:.4f}',
             monitor='val_loss',
             mode='min',
-            save_best_only=False
+            save_best_only=True
         )
         callbacks.append(check_callback)
 
@@ -166,8 +169,10 @@ class ModelTrainer(BaseTrainer):
         None
         """
 
-        # Load model
-        self.model = tf.keras.models.load_model(checkdir)
+        # Load the newest model checkpoint
+        checkpoints = glob.glob(checkdir + '/*')
+        checkpoints.sort(key=os.path.getmtime)
+        self.model = tf.keras.models.load_model(checkpoints[-1])
 
         # Run predict_plot function, calculate discrete predictions
         preds, labels = self.predict_plot(plotdir + "/final_output.png")

@@ -22,6 +22,8 @@ print("Num GPUs Available:", len(tf.config.list_physical_devices('GPU')))
 
 parser = argparse.ArgumentParser()
 
+parser.add_argument('--checkpoint', default=None, type=str, required=False,
+                    help='If set, simply load the model from the provided checkpoint and continue training')
 parser.add_argument('--type', default='dnn', type=str,
                     help='Type of model to build (dnn, efn, pfn)')
 parser.add_argument('--nodes', default=None, type=int, nargs='*',
@@ -70,6 +72,8 @@ parser.add_argument('--dir', default=None, required=True, type=str,
                     help='The directory to be used for placing training output')
 parser.add_argument('--logdir', default='.', type=str,
                     help='The directory to be used for placing tensorboard logs')
+parser.add_argument('--no_weights', action='store_false',
+                    help='Include to prevent data loader from providing training weights')
 args = parser.parse_args()
 
 # Convert args namespace to dict to use in building model
@@ -81,4 +85,4 @@ mt = ModelTrainer(setup, args.file)
 # Run routine
 plots = args.dir + '/plots'
 checks = args.dir + '/checkpoints'
-mt.routine(plots, checks, args.logdir, patience=24, use_schedule=args.schedule)
+mt.routine(plots, checks, args.logdir, patience=20, use_schedule=args.schedule)

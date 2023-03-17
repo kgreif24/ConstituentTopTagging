@@ -12,7 +12,6 @@ Last updated 10/16/22
 
 import h5py
 import numpy as np
-import tensorflow as tf
 from tensorflow.keras.utils import Sequence
 
 import time
@@ -31,7 +30,8 @@ class DataLoader(Sequence):
                  net_type='dnn',
                  max_constits=80,
                  num_folds=5,
-                 this_fold=1):
+                 this_fold=1,
+                 use_weights=True):
         """ __init__ - Init function for this class. Will load in root file
         using uproot. As Sequence class has no specific init function, don't
         need to worry about calling super().
@@ -46,6 +46,7 @@ class DataLoader(Sequence):
             max_constits (int): Number of constituents to include in constituent models
             num_folds (int): The number of folds data is split into
             this_fold (int): The number of the fold to use, 1-num_folds
+            use_weights (bool): If set to false, loader will not attempt to pull weights from .h5
 
         Returns:
             None
@@ -56,6 +57,7 @@ class DataLoader(Sequence):
         self.batch_size = batch_size
         self.mode = mode
         self.net_type = net_type
+        self.use_weights = use_weights
 
         # Load hdf5 file using h5py, braches will be loaded in get item function
         self.file = h5py.File(file_path, 'r')
@@ -66,22 +68,16 @@ class DataLoader(Sequence):
         # Now we need to find the sample shape, depends on net_type
         if 'hl' in self.net_type:
             self.sample_shape = self.file['hl'].shape[1:]
-            self.load_taste = False
         elif self.net_type == 'resnet':
             self.sample_shape = (64, 64, 1)  # Simply hard code image dims
-            self.load_taste = False
         elif self.net_type == 'dnn':
-            self.sample_shape = (self.max_constits, 10)
-            self.load_taste = True
+            self.sample_shape = (self.max_constits, 7)
         elif self.net_type == 'efn':
             self.sample_shape = (self.max_constits, 2)
-            self.load_taste = True
         elif self.net_type == 'pfn':
             self.sample_shape = (self.max_constits, 7)
-            self.load_taste = False
         elif self.net_type == 'pnet':
             self.sample_shape = (self.max_constits, 7)
-            self.load_taste = False
         else:
             raise ValueError("Model type not recognized!")
 
@@ -175,9 +171,6 @@ class DataLoader(Sequence):
             # Given this is true, we just index using a slice of the numpy array
             batch_indeces = self.indeces[start:stop]
             batch_data = self.file[data_key][batch_indeces,...]
-            if self.load_taste:
-                taste_data = self.file['fjet_clus_taste'][batch_indeces,...]
-                batch_data = np.concatenate([batch_data, taste_data], axis=2)
 
             # Resnet needs pt data for pixel intensity
             if self.net_type == 'resnet':
@@ -187,7 +180,10 @@ class DataLoader(Sequence):
             # occur if we are training
             assert not self.mode == 'valid' or self.mode == 'test'
             batch_labels = self.file['labels'][batch_indeces]
-            batch_weights = self.file['weights'][batch_indeces]
+            if self.use_weights:
+                batch_weights = self.file['training_weights'][batch_indeces]
+            else:
+                batch_weights = None
 
         else:
 
@@ -198,9 +194,6 @@ class DataLoader(Sequence):
             # as this number needs to be turned into the second number in a slice. What a mess.
             batch_stop = self.indeces[stop-1] + 1
             batch_data = self.file[data_key][batch_start:batch_stop,...]
-            if self.load_taste:
-                taste_data = self.file['fjet_clus_taste'][batch_start:batch_stop,...]
-                batch_data = np.concatenate([batch_data, taste_data], axis=2)
 
             # Again, resnet needs pt data for pixel intensity
             if self.net_type == 'resnet':
@@ -208,7 +201,10 @@ class DataLoader(Sequence):
 
             # Now load labels and weights the regular way
             batch_labels = self.file['labels'][batch_start:batch_stop]
-            batch_weights = self.file['weights'][batch_start:batch_stop]
+            if self.mode == 'train' and self.use_weights:
+                batch_weights = self.file['training_weights'][batch_start:batch_stop]
+            else:
+                batch_weights = None
 
         # Now we have model dependent reshapes
         if self.net_type == 'hldnn':
@@ -225,12 +221,9 @@ class DataLoader(Sequence):
         elif self.net_type == 'efn':
 
             # For EFNs, we need to split pT and angular information
-            # Dump in taste information just to see what happens
             pT = batch_data[:,:self.max_constits,2]
             ang = batch_data[:,:self.max_constits,0:2]
-            taste = batch_data[:,:self.max_constits,7:10]
-            phi_in = np.concatenate((ang, taste), axis=2)
-            shaped_data = [pT, phi_in]
+            shaped_data = [pT, ang]
 
         elif self.net_type == 'pfn':
 
@@ -263,7 +256,7 @@ class DataLoader(Sequence):
 
             # pnet expects a dictionary containing points, features, and a mask.
             # Points will be eta,phi information stacked along constituent axis
-            # Features will be (pT, eta, phi, E, taste) information as passed to PFN.
+            # Features will be (pT, eta, phi, E) information as passed to PFN.
             # Mask will be pT information. Use this to allow code to process
             # variable length inputs.
             shaped_data = {}
@@ -272,7 +265,10 @@ class DataLoader(Sequence):
             shaped_data['mask'] = batch_data[:,:self.max_constits,2]  # pT
 
         # Finally package everything into a tuple and return
-        return shaped_data, batch_labels, batch_weights
+        if self.mode == 'train' and self.use_weights:
+            return shaped_data, batch_labels, batch_weights
+        else:
+            return shaped_data, batch_labels
 
 class FakeLoader(Sequence):
 

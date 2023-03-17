@@ -18,6 +18,7 @@ outfiles/*
 plots/*
 checkpoints/*
 logs/*
+tuning/*
 
 Root2HDF5/make_set?.py
 Root2HDF5/r2h_syst?.py
